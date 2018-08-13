@@ -1,0 +1,11 @@
+Metadata-Version: 1.2
+Name: vp-cnn
+Version: 0.0.1
+Summary: Text CNNs for Virtual Patient question classification
+Home-page: https://github.com/jaffe59/vp-cnn
+Author: Lifeng Jin, Evan Jaffe
+Author-email: UNKNOWN
+License: Apache 2.0
+Description: UNKNOWN
+Platform: UNKNOWN
+Requires-Python: >=3

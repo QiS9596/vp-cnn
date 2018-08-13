@@ -1,0 +1,7 @@
+#python package stuff
+
+dist
+*.egg-info
+
+#emacs junk
+*~
