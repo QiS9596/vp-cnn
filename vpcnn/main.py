@@ -82,6 +82,7 @@ parser.add_argument('-ensemble', type=str, default='poe',
 parser.add_argument('-num-experts', type=int, default=5, help='number of experts if poe is enabled [default: 5]')
 parser.add_argument('-prediction-file-handle', type=str, default='predictions.txt', help='the file to output the test predictions')
 parser.add_argument('-no-always-norm', action='store_true', default=False, help='always max norm the weights')
+parser.add_argument('-eval-enh', action='store_true', default=False, help='run the enhanced test set against the cross-validation-trained model')
 args = parser.parse_args()
 
 prediction_file_handle = open(args.prediction_file_handle, 'w')
@@ -157,6 +158,14 @@ def vp(text_field, label_field, foldid, num_experts=0, **kargs):
             **kargs)
     return train_iter, dev_iter, test_iter
 
+def vp_enh(text_field, label_field, **kargs):
+    # print('num_experts', num_experts)
+    enh_data = vpdataset.VP(text_field, label_field, path='data', filename='vp17-all.shuffled.69.lbl_in.txt')
+    # this is just being treated as a test set for now, so it doesn't matter how many
+    # experts there are, and we want to use the existing vocabularies from training for evaluation
+    enh_iter = data.Iterator(enh_data, args.batch_size, train=False)
+    return enh_iter
+
 
 def char_tokenizer(mstring):
     return list(mstring)
@@ -192,9 +201,12 @@ orig_save_dir = args.save_dir
 update_args = True
 
 indices = calc_indices(args)
-labels = read_in_labels('data/labels.txt')
-dialogues = read_in_dialogues('data/wilkins_corrected.shuffled.51.indices')
-chats = read_in_chat('data/stats.16mar2017.csv', dialogues)
+labels, inv_labels = read_in_labels('data/labels.txt')
+dialogues = read_in_dial_turn_idxs('data/wilkins_corrected.shuffled.51.indices')
+full_dials = read_in_dialogues('data/vp16-CS_remapped.full.csv')
+enh_dial_idxs = read_in_dial_turn_idxs('data/vp17-all.shuffled.69.indices') 
+full_enh_dials = read_in_dialogues('data/vp17-all.full.csv') 
+#chats = read_in_chat('data/stats.16mar2017.csv', dialogues)
 
 for xfold in range(args.xfolds):
     print("Fold {0}".format(xfold))
@@ -218,7 +230,8 @@ for xfold in range(args.xfolds):
     # print(label_field.vocab.itos)
 
     
-    args.class_num = 359
+    #TODO make this dependent on size of labels.txt
+    args.class_num = 361
     args.cuda = args.yes_cuda and torch.cuda.is_available()  # ; del args.no_cuda
     if update_args == True:
         if isinstance(args.char_kernel_sizes,str):
@@ -362,13 +375,24 @@ for xfold in range(args.xfolds):
     if args.eval_on_test:
         result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
                                            log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
-                                           labels=labels, chats=chats, dialogues=dialogues, indices=indices, fold_id=xfold)
+                                           labels=labels, inv_labels=inv_labels, full_dials=full_dials, dialogues=dialogues, indices=indices, fold_id=xfold)
         ensemble_test_fold_accuracies.append(result)
 
         print("Completed fold {0}. Accuracy on Test: {1} for LOGIT".format(xfold, result))
         print("Completed fold {0}. Accuracy on Test: {1} for LOGIT".format(xfold, result), file=log_file_handle)
 
     log_file_handle.flush()
+
+if args.eval_enh:
+    print("Begin evaluation of enhanced set")
+    enh_prediction_file_handle = open('predict_enh.txt', 'w')
+    enh_char = vp_enh(text_field, label_field)
+    enh_word = vp_enh(word_field, label_field)
+    result = train.eval_final_ensemble(enh_char, enh_word, char_cnn, word_cnn, final_logit, args,
+                                       log_file_handle=log_file_handle, prediction_file_handle=enh_prediction_file_handle,
+                                       labels=labels, inv_labels=inv_labels, full_dials=full_enh_dials, dialogues=enh_dial_idxs,
+                                       indices=[(0,len(full_enh_dials))], fold_id=0)
+    enh_prediction_file_handle.close()
 
 print("CHAR mean accuracy is {}, std is {}".format(np.mean(char_dev_fold_accuracies), np.std(char_dev_fold_accuracies)))
 print("WORD mean accuracy is {}, std is {}".format(np.mean(word_dev_fold_accuracies), np.std(word_dev_fold_accuracies)))

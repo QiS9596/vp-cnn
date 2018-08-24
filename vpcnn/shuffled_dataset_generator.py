@@ -14,14 +14,14 @@ def shuffle_data(dataset_list, dialogues, shuffled_data_file, indices_file):
     indices_file_handle.close()
 
 def main(data_file, dialogue_file, shuffled_data_file, indices_file):
-    dialogues = read_in_dialogues(dialogue_file)
+    dialogues = calc_dial_turn_idxs(dialogue_file)
     data_list = open(data_file).readlines()
     shuffle_data(data_list, dialogues, shuffled_data_file, indices_file)
 
 if __name__ == '__main__':
-    dialogue_file = 'corrected.tsv'
-    data_file = 'wilkins_corrected.tsv'
+    dialogue_file = 'vp17-all.full.csv'
+    data_file = 'vp17-all.lbl_in.csv'
     a = random.randint(0, 100)
-    shuffled_data_file = 'wilkins_corrected.shuffled.'+str(a)+'.txt'
-    indices_file = 'wilkins_corrected.shuffled.'+str(a)+'.indices'
+    shuffled_data_file = 'vp17-all.shuffled.'+str(a)+'.lbl_in.txt'
+    indices_file = 'vp17-all.shuffled.'+str(a)+'.indices'
     main(data_file, dialogue_file,shuffled_data_file, indices_file)

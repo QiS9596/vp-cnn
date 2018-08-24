@@ -16,29 +16,52 @@ def calc_indices(args):
 
 def read_in_labels(labels_file):
     labels = []
+    inv_labels = {}
     with open(labels_file) as l:
         for line in l:
             line = line.strip().split("\t")
             labels.append('_'.join(line[1].split(' ')))
-    return labels
+            inv_labels[line[1]] = int(line[0])
+    return labels, inv_labels
 
 def read_in_dialogues(dialogue_file):
+    full_dials = {}
+    dialogue_index = -1
+    turn_index = -1
+    with open(dialogue_file) as l:
+        for line in l:
+            if line.startswith('#S'):
+                dialogue_index += 1
+                turn_index = 0
+            else:
+                turn = line.strip().split('\t')
+                full_dials[(dialogue_index, turn_index)] = turn
+                turn_index += 1
+    return full_dials
+
+def read_in_dial_turn_idxs(dialogue_file):
     dialogue_indices = []
     dialogue_index = -1
     turn_index = -1
-    if dialogue_file.endswith('indices'):
-        with open(dialogue_file) as l:
-            for line in l:
-                dialogue_indices.append(ast.literal_eval(line.strip()))
-    else:
-        with open(dialogue_file) as l:
-            for line in l:
-                if line.startswith('#S'):
-                    dialogue_index += 1
-                    turn_index = 0
-                else:
-                    dialogue_indices.append((dialogue_index, turn_index))
-                    turn_index += 1
+    assert(dialogue_file.endswith('indices'))
+    with open(dialogue_file) as l:
+        for line in l:
+            dialogue_indices.append(ast.literal_eval(line.strip()))
+    return dialogue_indices
+
+def calc_dial_turn_idxs(dialogue_file):
+    dialogue_indices = []
+    full_dials = {}
+    dialogue_index = -1
+    turn_index = -1
+    with open(dialogue_file) as l:
+        for line in l:
+            if line.startswith('#S'):
+                dialogue_index += 1
+                turn_index = 0
+            else:
+                dialogue_indices.append((dialogue_index, turn_index))
+                turn_index += 1
     return dialogue_indices
 
 def read_in_chat(chat_file, dialogues):
@@ -54,7 +77,7 @@ def read_in_chat(chat_file, dialogues):
                 chats[this_index] = (line[-2], line[-1])
     return chats
 
-def print_test_features(tensor, confidence, ave_probs, ave_logprobs, target, dialogue_indices, labels, indices, fold_id, chats, feature_file):
+def print_test_features(tensor, confidence, ave_probs, ave_logprobs, target, dialogue_indices, labels, inv_labels, indices, fold_id, full_dials, feature_file):
     # dial_id, turn_id, predicted_label, correct_bool, prob, entropy, confidence, chat_prob, chat_rank
     tensor = torch.exp(tensor)
     probs, predicted = torch.max(tensor, 1)
@@ -70,6 +93,8 @@ def print_test_features(tensor, confidence, ave_probs, ave_logprobs, target, dia
         item = []
         item_id = start_id+ind
         dialogue_index, turn_index = dialogue_indices[item_id]
+        turn = full_dials[(dialogue_index, turn_index)]
+        cs_idx = inv_labels[turn[3]] if turn[3] != "none" else None
         item.append(dialogue_index)
         item.append(turn_index)
         item.append(labels[predicted[ind]])
@@ -83,8 +108,8 @@ def print_test_features(tensor, confidence, ave_probs, ave_logprobs, target, dia
         item.append(confidence[ind, predicted[ind]])
         item.append(ave_probs[ind, predicted[ind]])
         item.append(ave_logprobs[ind, predicted[ind]])
-        item.append(chats[(dialogue_index, turn_index)][0])
-        item.append(chats[(dialogue_index, turn_index)][1])
+        item.append(tensor[ind, cs_idx] if cs_idx is not None else '') #cs_prob
+        item.append(stats.rankdata(-tensor[ind], method='min')[cs_idx] if cs_idx is not None else '') #cs_rank
         print(','.join([str(x) for x in item]), file=feature_file)
 
 

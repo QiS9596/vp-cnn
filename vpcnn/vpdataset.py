@@ -10,13 +10,11 @@ import pkg_resources
 class VP(data.Dataset):
     """modeled after Shawn1993 github user's Pytorch implementation of Kim2014 - cnn for text categorization"""
 
-    filename = pkg_resources.resource_filename('vpcnn', 'data/wilkins_corrected.shuffled.51.txt')
-
     @staticmethod
     def sort_key(ex):
         return len(ex.text)
 
-    def __init__(self, text_field, label_field, path=None, examples=None, **kwargs):
+    def __init__(self, text_field, label_field, path=None, filename=None, examples=None, **kwargs):
         """Create a virtual patient (VP) dataset instance given a path and fields.
 
         Arguments:
@@ -32,8 +30,11 @@ class VP(data.Dataset):
 
         if examples is None:
                 path = self.dirname if path is None else path
+                # TODO FIXME this might need fixin'
+                filename = pkg_resources.resource_filename('vpcnn', 'data/wilkins_corrected.shuffled.51.txt') \
+                    if filename is None else filename
                 examples = []
-                with open(os.path.join(path, self.filename)) as f:
+                with open(os.path.join(path, filename)) as f:
                     lines = f.readlines()
                     #pdb.set_trace()
                     for line in lines:

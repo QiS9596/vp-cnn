@@ -357,3 +357,5 @@
 356	has the pain stopped you from doing anything
 357	are you abused
 358	do you use contraception every time
+359	unknown
+360	negative symptoms
