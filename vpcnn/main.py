@@ -39,7 +39,10 @@ parser.add_argument('-eval-on-test', action='store_true', default=False, help='r
 parser.add_argument('-save-interval', type=int, default=5000, help='how many steps to wait before saving [default:500]')
 parser.add_argument('-save-dir', type=str, default='snapshot', help='where to save the snapshot')
 # data 
+parser.add_argument('-data-dir', type=str, default='./data/', help='directory containing data files')
 parser.add_argument('-shuffle', action='store_true', default=True, help='shuffle the data every epoch')
+parser.add_argument('-train-file', type=str, default='wilkins_corrected.shuffled.51.txt', help='file containing word data for training, in `data-dir`')
+parser.add_argument('-test-file', type=str, default=None, help='file containing word data for testing, in `data-dir`')
 # model
 parser.add_argument('-dropout', type=float, default=0.5, help='the probability for dropout [default: 0.5]')
 parser.add_argument('-char-dropout', type=float, default=0.5, help='the probability for dropout [default: 0.5]')
@@ -64,7 +67,8 @@ parser.add_argument('-yes-cuda', action='store_true', default=True, help='disabl
 parser.add_argument('-snapshot', type=str, default=None, help='filename of model snapshot [default: None]')
 parser.add_argument('-predict', type=str, default=None, help='predict the sentence given')
 parser.add_argument('-test', action='store_true', default=False, help='train or test')
-parser.add_argument('-xfolds', type=int, default=10, help='number of folds for cross-validation')
+parser.add_argument('-xfolds', type=int, default=10, help='number of folds for cross\
+-validation; if zero, do not split test set from training data')
 parser.add_argument('-layer-num', type=int, default=2, help='the number of layers in the final MLP')
 parser.add_argument('-word-vector', type=str, default='w2v',
                     help="use of vectors [default: w2v. options: 'glove' or 'w2v']")
@@ -82,7 +86,7 @@ parser.add_argument('-ensemble', type=str, default='poe',
 parser.add_argument('-num-experts', type=int, default=5, help='number of experts if poe is enabled [default: 5]')
 parser.add_argument('-prediction-file-handle', type=str, default='predictions.txt', help='the file to output the test predictions')
 parser.add_argument('-no-always-norm', action='store_true', default=False, help='always max norm the weights')
-parser.add_argument('-eval-enh', action='store_true', default=False, help='run the enhanced test set against the cross-validation-trained model')
+#parser.add_argument('-eval-enh', action='store_true', default=False, help='run the enhanced test set against the cross-validation-trained model')
 args = parser.parse_args()
 
 prediction_file_handle = open(args.prediction_file_handle, 'w')
@@ -123,9 +127,9 @@ def mr(text_field, label_field, **kargs):
 
 
 # load VP dataset
-def vp(text_field, label_field, foldid, num_experts=0, **kargs):
+def vp(text_field, label_field, foldid, path=None, filename=None, test_filename=None, num_experts=0, **kargs):
     # print('num_experts', num_experts)
-    train_data, dev_data, test_data = vpdataset.VP.splits(text_field, label_field, foldid=foldid,
+    train_data, dev_data, test_data = vpdataset.VP.splits(text_field, label_field, root=path, filename=filename, test_filename=test_filename, foldid=foldid,
                                                           num_experts=num_experts)
     if num_experts > 0:
         text_field.build_vocab(train_data[0], dev_data[0], test_data, wv_type=kargs["wv_type"], wv_dim=kargs["wv_dim"],
@@ -186,7 +190,13 @@ def check_vocab(field):
     for word in other_vocab:
         if word not in itos:
             print(word)
-
+# TODO these separate functions should probably be handled separately;
+# i.e. how many folds, and whether or not to split test out of the training set;
+# Would require changes to vp(), etc. aes-20180827
+no_test_split = False
+if args.xfolds == 0:
+    no_test_split = True
+    args.xfolds = 1
 
 print("Beginning {0}-fold cross-validation...".format(args.xfolds))
 print("Logging the results in {}".format(args.log_file))
@@ -201,6 +211,9 @@ orig_save_dir = args.save_dir
 update_args = True
 
 indices = calc_indices(args)
+data_dir = args.data_dir
+train_file = args.train_file
+test_file = args.test_file
 labels, inv_labels = read_in_labels('data/labels.txt')
 dialogues = read_in_dial_turn_idxs('data/wilkins_corrected.shuffled.51.indices')
 full_dials = read_in_dialogues('data/vp16-CS_remapped.full.csv')
@@ -218,14 +231,43 @@ for xfold in range(args.xfolds):
     word_field = data.Field(lower=True, tokenize=tokenizer)
     label_field = data.Field(sequential=False, use_vocab=False, preprocessing=int)
 
-    train_iter, dev_iter, test_iter = vp(text_field, label_field, foldid=xfold, num_experts=args.num_experts,
-                                         device=args.device, repeat=False, sort=False
-                                         , wv_type=None, wv_dim=None, wv_dir=None, min_freq=1)
-    train_iter_word, dev_iter_word, test_iter_word = vp(word_field, label_field, foldid=xfold,
-                                                       num_experts=args.num_experts, device=args.device,
-                                                       repeat=False, sort=False, wv_type=args.word_vector,
-                                                       wv_dim=args.word_embed_dim, wv_dir=args.emb_path,
-                                                       min_freq=args.min_freq)
+    train_iter, dev_iter, test_iter = vp(text_field, 
+                                         label_field, 
+                                         path=data_dir, 
+                                         filename=train_file,
+                                         test_filename=test_file,
+                                         foldid=None if no_test_split else xfold, 
+                                         num_experts=args.num_experts,
+                                         device=args.device, 
+                                         repeat=False, 
+                                         sort=False, 
+                                         wv_type=None, 
+                                         wv_dim=None, 
+                                         wv_dir=None, 
+                                         min_freq=1)
+    train_iter_word, dev_iter_word, test_iter_word = vp(word_field, 
+                                                        label_field, 
+                                                        path=data_dir, 
+                                                        filename=train_file,
+                                                        test_filename=test_file,
+                                                        foldid=None if no_test_split else xfold,
+                                                        num_experts=args.num_experts, 
+                                                        device=args.device,
+                                                        repeat=False, 
+                                                        sort=False, 
+                                                        wv_type=args.word_vector,
+                                                        wv_dim=args.word_embed_dim, 
+                                                        wv_dir=args.emb_path,
+                                                        min_freq=args.min_freq)
+    
+    #train_iter, dev_iter, test_iter = vp(text_field, label_field, foldid=xfold, num_experts=args.num_experts,
+    #                                     device=args.device, repeat=False, sort=False
+    #                                     , wv_type=None, wv_dim=None, wv_dir=None, min_freq=1)
+    #train_iter_word, dev_iter_word, test_iter_word = vp(word_field, label_field, foldid=xfold,
+    #                                                   num_experts=args.num_experts, device=args.device,
+    #                                                   repeat=False, sort=False, wv_type=args.word_vector,
+    #                                                   wv_dim=args.word_embed_dim, wv_dir=args.emb_path,
+    #                                                   min_freq=args.min_freq)
     # check_vocab(word_field)
     # print(label_field.vocab.itos)
 
@@ -358,24 +400,57 @@ for xfold in range(args.xfolds):
             print("Sorry, This snapshot doesn't exist.");
             exit()
 
-    train_iter, dev_iter, test_iter = vp(text_field, label_field, foldid=xfold, device=args.device, repeat=False,
-                                         shuffle=False, sort=False
-                                         , wv_type=None, wv_dim=None, wv_dir=None, min_freq=1)
-    train_iter_word, dev_iter_word, test_iter_word = vp(word_field, label_field, foldid=xfold,
+    train_iter, dev_iter, test_iter = vp(text_field, 
+                                         label_field, 
+                                         path=data_dir, 
+                                         filename=train_file,
+                                         test_filename=test_file,
+                                         foldid=None if no_test_split else xfold, 
+                                         num_experts=args.num_experts,
+                                         device=args.device, 
+                                         repeat=False, 
+                                         sort=False, 
+                                         wv_type=None, 
+                                         wv_dim=None, 
+                                         wv_dir=None, 
+                                         min_freq=1)
+    train_iter_word, dev_iter_word, test_iter_word = vp(word_field, 
+                                                        label_field, 
+                                                        path=data_dir, 
+                                                        filename=train_file,
+                                                        test_filename=test_file,
+                                                        foldid=None if no_test_split else xfold,
+                                                        num_experts=args.num_experts, 
                                                         device=args.device,
-                                                        repeat=False, sort=False, shuffle=False,
+                                                        repeat=False, 
+                                                        sort=False, 
                                                         wv_type=args.word_vector,
-                                                        wv_dim=args.word_embed_dim, wv_dir=args.emb_path,
+                                                        wv_dim=args.word_embed_dim, 
+                                                        wv_dir=args.emb_path,
                                                         min_freq=args.min_freq)
+#    train_iter, dev_iter, test_iter = vp(text_field, label_field, foldid=xfold, device=args.device, repeat=False,
+#                                         shuffle=False, sort=False
+#                                         , wv_type=None, wv_dim=None, wv_dir=None, min_freq=1)
+#    train_iter_word, dev_iter_word, test_iter_word = vp(word_field, label_field, foldid=xfold,
+#                                                        device=args.device,
+#                                                        repeat=False, sort=False, shuffle=False,
+#                                                        wv_type=args.word_vector,
+#                                                        wv_dim=args.word_embed_dim, wv_dir=args.emb_path,
+#                                                        min_freq=args.min_freq)
 
     acc = train.train_final_ensemble(train_iter, dev_iter, train_iter_word, dev_iter_word, char_cnn, word_cnn, final_logit,
                                      args, log_file_handle=log_file_handle)
     ensemble_dev_fold_accuracies.append(acc)
     print("Completed fold {0}. Accuracy on Dev: {1} for LOGIT".format(xfold, acc), file=log_file_handle)
     if args.eval_on_test:
-        result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
-                                           log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
-                                           labels=labels, inv_labels=inv_labels, full_dials=full_dials, dialogues=dialogues, indices=indices, fold_id=xfold)
+        if test_file is not None:
+            result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
+                                               log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
+                                               labels=labels, inv_labels=inv_labels, full_dials=full_enh_dials, dialogues=enh_dial_idxs, indices=indices, fold_id=xfold)
+        else:
+            result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
+                                               log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
+                                               labels=labels, inv_labels=inv_labels, full_dials=full_dials, dialogues=dialogues, indices=indices, fold_id=xfold)
         ensemble_test_fold_accuracies.append(result)
 
         print("Completed fold {0}. Accuracy on Test: {1} for LOGIT".format(xfold, result))
@@ -383,7 +458,7 @@ for xfold in range(args.xfolds):
 
     log_file_handle.flush()
 
-if args.eval_enh:
+if False: #args.eval_enh:
     print("Begin evaluation of enhanced set")
     enh_prediction_file_handle = open('predict_enh.txt', 'w')
     enh_char = vp_enh(text_field, label_field)

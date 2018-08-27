@@ -50,7 +50,8 @@ class VP(data.Dataset):
     @classmethod
     #def splits(cls, text_field, label_field, dev_ratio=.1, shuffle=True ,root='.', **kwargs):
     def splits(cls, text_field, label_field, numfolds=10, foldid=None, dev_ratio=.1, shuffle=False, root='.',
-               num_experts=0, **kwargs):
+               filename=None, test_filename=None, num_experts=0, **kwargs):
+
         
         """Create dataset objects for splits of the VP dataset.
 
@@ -68,7 +69,9 @@ class VP(data.Dataset):
         """
         #path = cls.download_or_unzip(root)
         #examples = cls(text_field, label_field, path=path, **kwargs).examples
-        examples = cls(text_field, label_field, path=root, **kwargs).examples
+        examples = cls(text_field, label_field, path=root, filename=filename, **kwargs).examples
+        if test_filename is not None:
+            test_examples = cls(text_field, label_field, path=root, filename=test_filename, **kwargs).examples
         if shuffle: random.shuffle(examples)
         fields = [('text', text_field), ('label', label_field)]
         label_examples = []
@@ -82,9 +85,33 @@ class VP(data.Dataset):
                 label_examples += [this_example]
         
         if foldid==None:
-            dev_index = -1 * int(dev_ratio*len(examples))
-            return (cls(text_field, label_field, examples=examples[:dev_index]),
-                    cls(text_field, label_field, examples=examples[dev_index:]))
+            if num_experts > 0:
+                assert num_experts <= 5
+                dev_length = math.floor(len(examples) * dev_ratio)
+                if test_filename is not None:
+                    test = test_examples
+                    traindev = examples
+                else:
+                    test = examples[:dev_length]
+                    traindev = examples[dev_length:]
+                # TODO get test set
+                trains = []
+                devs = []
+                # print(dev_length)
+                for i in range(num_experts):
+                    devs.append(cls(text_field, label_field, examples=traindev[dev_length*i:dev_length*(i+1)]))
+                    trains.append(cls(text_field, label_field, examples=traindev[:dev_length*i]+traindev[dev_length*(i+1):]+label_examples))
+                return (trains, devs, cls(text_field, label_field, examples=test))
+
+            else:
+                dev_index = -1 * int(dev_ratio*len(examples))
+                if test_filename is not None:
+                    return (cls(text_field, label_field, examples=examples[:dev_index]),
+                            cls(text_field, label_field, examples=examples[dev_index:]),
+                            cls(text_field, label_field, examples=test_examples))
+                else:
+                    return (cls(text_field, label_field, examples=examples[:dev_index]),
+                            cls(text_field, label_field, examples=examples[dev_index:]))
         else:
             #get all folds
             fold_size = math.ceil(len(examples)/numfolds)
