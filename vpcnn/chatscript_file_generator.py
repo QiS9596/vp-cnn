@@ -77,7 +77,7 @@ def read_in_chat(chat_file, dialogues):
                 chats[this_index] = (line[-2], line[-1])
     return chats
 
-def print_test_features(tensor, confidence, ave_probs, ave_logprobs, target, dialogue_indices, labels, inv_labels, indices, fold_id, full_dials, feature_file):
+def print_test_features(tensor, confidence, ave_probs, ave_logprobs, target, dialogue_indices, labels, inv_labels, indices, fold_id, full_dials, feature_file, test_batch_size, batch_idx):
     # dial_id, turn_id, predicted_label, correct_bool, prob, entropy, confidence, chat_prob, chat_rank
     tensor = torch.exp(tensor)
     probs, predicted = torch.max(tensor, 1)
@@ -91,7 +91,7 @@ def print_test_features(tensor, confidence, ave_probs, ave_logprobs, target, dia
     start_id, end_id = indices[fold_id]
     for ind, val in enumerate(corrects):
         item = []
-        item_id = start_id+ind
+        item_id = start_id+(batch_idx*test_batch_size)+ind
         dialogue_index, turn_index = dialogue_indices[item_id]
         turn = full_dials[(dialogue_index, turn_index)]
         cs_idx = inv_labels[turn[3]] if turn[3] != "none" else None

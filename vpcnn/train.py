@@ -4,7 +4,7 @@ import torch
 import torch.autograd as autograd
 import torch.nn.functional as F
 import copy
-from vpcnn.chatscript_file_generator import print_test_features
+from chatscript_file_generator import print_test_features
 
 def ensemble_predict(batch, models, args, **kwargs):
     for model in models:
@@ -81,66 +81,81 @@ def ensemble_train(trains, devs, models, args, **kwargs):
 def ensemble_eval(data_iter, models, args, **kwargs):
     for model in models:
         model.eval()
-    corrects, avg_loss = [], []
-    logits = []
+    mdl_corrects = [0] * len(models)
+    mdl_avg_losses = [0.0] * len(models)
+    ens_correct = 0
+    #(model, instance, class)
     data_iter.shuffle = False
-    for index, model in enumerate(models):
-        for batch in data_iter: # should be only 1 batch
-            feature, target = batch.text, batch.label
-            feature.data.t_(), target.data.sub_(0)  # batch first, index align
-            if args.cuda:
-                feature, target = feature.cuda(), target.cuda()
-
+    for batch_idx, batch in enumerate(data_iter):
+        mdl_logits = torch.zeros([len(models),
+                                  batch.batch_size,
+                                  args.class_num])
+        if args.cuda:
+            mdl_logits.cuda()
+        feature, target = batch.text, batch.label
+        if args.cuda:
+            feature, target = feature.cuda(), target.cuda()
+        feature.data.t_(), target.data.sub_(0)  # batch first, index align
+        #print(target.size())
+        for model_idx, model in enumerate(models):
             logit = model(feature) # log softmaxed
+            #print(logit.size())
+            mdl_logits[model_idx,:,:] = logit.data
             loss = F.nll_loss(logit, target, size_average=False)
 
-            avg_loss = loss.data[0]
-            corrects = (torch.max(logit, 1)
+            mdl_avg_losses[model_idx] += loss.data[0]
+            mdl_corrects[model_idx] += (torch.max(logit, 1)
                          [1].view(target.size()).data == target.data).sum()
+        total_logit = 0
+        if args.ensemble == 'poe': # raw model output is logged, so adding is multiplying
+            total_logit = torch.sum(mdl_logits, 0)
+        elif args.ensemble == 'avg':
+            probs = torch.exp(mdl_logits) # unlog to add, no need to normalize
+            total_logit = torch.sum(probs, 0)
+        elif args.ensemble == 'vot': # sum of argmaxes
+            maxes, _ = torch.max(mdl_logits, 2) # (model, instance, 1) # keepdim=True?
+            onehot = torch.eq(mdl_logits, maxes.expand(mdl_logits.size())) # (model, instance, class) by broadcast
+            #print(onehot.size())
+            total_logit = torch.sum(onehot, 0).squeeze() # (instance, class)
+            #print(total_logit.size())
 
-        size = len(data_iter.dataset)
-        avg_loss = avg_loss/size
+        choices = torch.max(total_logit, 1)[1].view(target.size())
+        ens_correct += choices.eq(target.data.cpu()).sum()
+
+    # logits.append(logit)
+    size = len(data_iter.dataset)
+    for model_idx, model in enumerate(models):
+        corrects = mdl_corrects[model_idx]
+        avg_loss = mdl_avg_losses[model_idx]/size
         accuracy = corrects/size * 100.0
         model.train()
-        print('\nEvaluation model {} on test - loss: {:.6f}  acc: {:.4f}%({}/{}) \n'.format(index, avg_loss,
-                                                                           accuracy,
-                                                                           corrects,
-                                                                           size))
+        print('\nEvaluation model {} on test - loss: {:.6f}  acc: {:.4f}%({}/{}) \n'.format(model_idx, avg_loss,
+                                                                                            accuracy,
+                                                                                            corrects,
+                                                                                            size))
         if args.verbose:
-            print('Evaluation model {} on test - loss: {:.6f}  acc: {:.4f}%({}/{}) \n'.format(index, avg_loss,
-                                                                               accuracy,
-                                                                               corrects,
-                                                                               size), file=kwargs['log_file_handle'])
-        logits.append(logit)
-    total_logit = 0
-    if args.ensemble == 'poe':
-        for some_logit in logits:
-            # print(some_logit[:10])
-            total_logit += some_logit.data
-    elif args.ensemble == 'avg':
-        total_logit = 0
-        for some_logit in logits:
-            total_logit += torch.exp(some_logit.data)
-    elif args.ensemble == 'vot':
-        total_logit = torch.zeros(logits[0].size())
-        for some_logit in logits:
-            _, indices = torch.max(some_logit.data, 1)
-            indices.squeeze_()
-            # print(indices[:10])
-            for index, top_index in enumerate(indices):
-                total_logit[index][top_index] += 1
-        if args.cuda:
-            total_logit = total_logit.cuda()
+            print('Evaluation model {} on test - loss: {:.6f}  acc: {:.4f}%({}/{}) \n'.format(model_idx, avg_loss,
+                                                                                              accuracy,
+                                                                                              corrects,
+                                                                                              size), file=kwargs['log_file_handle'])
+
+        
+#        total_logit = torch.zeros(logits[0].size())
+#        for some_logit in logits:
+#            _, indices = torch.max(some_logit.data, 1)
+#            indices.squeeze_()
+#            # print(indices[:10])
+#            for index, top_index in enumerate(indices):
+#                total_logit[index][top_index] += 1
+#        if args.cuda:
+#            total_logit = total_logit.cuda()
     # print(torch.max(total_logit, 1)
     #              [1].view(target.size())[:10])
     # print(target[:10])
-    corrects = (torch.max(total_logit, 1)
-                 [1].view(target.size()) == target.data).sum()
-    size = len(data_iter.dataset)
-    accuracy = corrects / size * 100.0
-    print('\nEvaluation ensemble {} - acc: {:.4f}%({}/{})'.format(args.ensemble.upper(), accuracy, corrects, size))
+    ens_accuracy = ens_correct/size * 100.0
+    print('\nEvaluation ensemble {} - acc: {:.4f}%({}/{})'.format(args.ensemble.upper(), ens_accuracy, ens_correct, size))
     if args.verbose:
-        print('Evaluation ensemble {} - acc: {:.4f}%({}/{})'.format(args.ensemble.upper(), accuracy, corrects, size), file=kwargs['log_file_handle'])
+        print('Evaluation ensemble {} - acc: {:.4f}%({}/{})'.format(args.ensemble.upper(), ens_accuracy, ens_correct, size), file=kwargs['log_file_handle'])
     return accuracy
 
 def train(train_iter, dev_iter, model, args, **kwargs):
@@ -353,7 +368,7 @@ def train_final_ensemble(char_train_data, char_dev_data, word_train_data, word_d
 def eval_final_ensemble(char_data, word_data, char_model, word_model, last_ensemble_model, args, **kwargs):
     last_ensemble_model.eval()
     corrects, avg_loss = 0, 0
-    for char_batch, word_batch in zip(char_data, word_data):
+    for batch_idx, (char_batch, word_batch) in enumerate(zip(char_data, word_data)):
         char_feature, char_target = char_batch.text, char_batch.label
         char_feature.data.t_()  # batch first, index align
         char_feature.volatile = True
@@ -387,8 +402,8 @@ def eval_final_ensemble(char_data, word_data, char_model, word_model, last_ensem
         corrects += (torch.max(logit, 1)
                      [1].view(char_target.size()).data == char_target.data).sum()
         if 'prediction_file_handle' in kwargs:
-            print_test_features(logit, char_confidence+word_confidence,char_ave_probs+word_ave_probs, char_ave_logprobs+word_ave_logprobs, char_target, kwargs['dialogues'], kwargs['labels'], kwargs['indices'],
-                                kwargs['fold_id'], kwargs['full_dials'], kwargs['prediction_file_handle'])
+            print_test_features(logit, char_confidence+word_confidence,char_ave_probs+word_ave_probs, char_ave_logprobs+word_ave_logprobs, char_target, kwargs['dialogues'], kwargs['labels'], kwargs['inv_labels'], kwargs['indices'],
+                                kwargs['fold_id'], kwargs['full_dials'], kwargs['prediction_file_handle'], kwargs['test_batch_size'], batch_idx)
     size = len(char_data.data())
     avg_loss = avg_loss / size
     accuracy = corrects / size * 100.0

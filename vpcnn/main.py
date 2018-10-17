@@ -99,6 +99,13 @@ elif args.word_vector == 'w2v':
 else:
     args.word_vector = None
 
+# TODO these separate functions should probably be handled separately;
+# i.e. how many folds, and whether or not to split test out of the training set;
+# Would require changes to vp(), etc. aes-20180827
+no_test_split = False
+if args.xfolds == 0:
+    no_test_split = True
+    args.xfolds = 1
 
 # load SST dataset
 def sst(text_field, label_field, **kargs):
@@ -125,6 +132,7 @@ def mr(text_field, label_field, **kargs):
         **kargs)
     return train_iter, dev_iter
 
+test_batch_size = args.batch_size if no_test_split else len(test_data)
 
 # load VP dataset
 def vp(text_field, label_field, foldid, path=None, filename=None, test_filename=None, num_experts=0, **kargs):
@@ -150,7 +158,7 @@ def vp(text_field, label_field, foldid, path=None, filename=None, test_filename=
             this_train_iter, this_dev_iter, test_iter = data.Iterator.splits((train_data[i], dev_data[i], test_data),
                                                                              batch_sizes=(args.batch_size,
                                                                                           len(dev_data[i]),
-                                                                                          len(test_data)), **kargs)
+                                                                                          test_batch_size), **kargs)
             train_iter.append(this_train_iter)
             dev_iter.append(this_dev_iter)
     else:
@@ -158,7 +166,7 @@ def vp(text_field, label_field, foldid, path=None, filename=None, test_filename=
             (train_data, dev_data, test_data),
             batch_sizes=(args.batch_size,
                          len(dev_data),
-                         len(test_data)),
+                         test_batch_size),
             **kargs)
     return train_iter, dev_iter, test_iter
 
@@ -190,13 +198,6 @@ def check_vocab(field):
     for word in other_vocab:
         if word not in itos:
             print(word)
-# TODO these separate functions should probably be handled separately;
-# i.e. how many folds, and whether or not to split test out of the training set;
-# Would require changes to vp(), etc. aes-20180827
-no_test_split = False
-if args.xfolds == 0:
-    no_test_split = True
-    args.xfolds = 1
 
 print("Beginning {0}-fold cross-validation...".format(args.xfolds))
 print("Logging the results in {}".format(args.log_file))
@@ -406,10 +407,10 @@ for xfold in range(args.xfolds):
                                          filename=train_file,
                                          test_filename=test_file,
                                          foldid=None if no_test_split else xfold, 
-                                         num_experts=args.num_experts,
                                          device=args.device, 
                                          repeat=False, 
                                          sort=False, 
+                                         shuffle=False,
                                          wv_type=None, 
                                          wv_dim=None, 
                                          wv_dir=None, 
@@ -420,10 +421,10 @@ for xfold in range(args.xfolds):
                                                         filename=train_file,
                                                         test_filename=test_file,
                                                         foldid=None if no_test_split else xfold,
-                                                        num_experts=args.num_experts, 
                                                         device=args.device,
                                                         repeat=False, 
-                                                        sort=False, 
+                                                        sort=False,
+                                                        shuffle=False,
                                                         wv_type=args.word_vector,
                                                         wv_dim=args.word_embed_dim, 
                                                         wv_dir=args.emb_path,
@@ -446,11 +447,13 @@ for xfold in range(args.xfolds):
         if test_file is not None:
             result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
                                                log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
-                                               labels=labels, inv_labels=inv_labels, full_dials=full_enh_dials, dialogues=enh_dial_idxs, indices=indices, fold_id=xfold)
+                                               labels=labels, inv_labels=inv_labels, full_dials=full_enh_dials, dialogues=enh_dial_idxs, indices=indices, fold_id=xfold,
+                                               test_batch_size=test_batch_size)
         else:
             result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
                                                log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
-                                               labels=labels, inv_labels=inv_labels, full_dials=full_dials, dialogues=dialogues, indices=indices, fold_id=xfold)
+                                               labels=labels, inv_labels=inv_labels, full_dials=full_dials, dialogues=dialogues, indices=indices, fold_id=xfold,
+                                               test_batch_size=test_batch_size)
         ensemble_test_fold_accuracies.append(result)
 
         print("Completed fold {0}. Accuracy on Test: {1} for LOGIT".format(xfold, result))
