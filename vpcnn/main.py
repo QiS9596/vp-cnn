@@ -319,9 +319,28 @@ for xfold in range(args.xfolds):
             print("  {}={}".format(attr.upper(), value))
 
         if args.snapshot is None and args.num_experts == 0:
-            char_cnn = model.CNN_Text(args, 'char')
+            char_cnn = model.CNN_Text(class_num=args.class_num,
+                                      kernel_num=args.char_kernel_num,
+                                      kernel_sizes=args.char_kernel_sizes,
+                                      embed_num=len(text_field.vocab), 
+                                      embed_dim=args.char_embed_dim, 
+                                      dropout=args.char_dropout,
+                                      conv_init='uniform',
+                                      fc_init='normal',
+                                      static=False,
+                                      vectors=None)
         elif args.snapshot is None and args.num_experts > 0:
-            char_cnn = [model.CNN_Text(args, 'char') for i in range(args.num_experts)]
+            char_cnn = [model.CNN_Text(class_num=args.class_num,
+                                       kernel_num=args.char_kernel_num,
+                                       kernel_sizes=args.char_kernel_sizes,
+                                       embed_num=len(text_field.vocab), 
+                                       embed_dim=args.char_embed_dim, 
+                                       dropout=args.char_dropout,
+                                       conv_init='uniform',
+                                       fc_init='normal',
+                                       static=False,
+                                       vectors=None)
+                        for i in range(args.num_experts)]
         else:
             print('\nLoading model from [%s]...' % args.snapshot)
             try:
@@ -375,9 +394,28 @@ for xfold in range(args.xfolds):
             args.save_dir = os.path.join(orig_save_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'), 'WORD')
 
         if args.snapshot is None and args.num_experts == 0:
-            word_cnn = model.CNN_Text(args, 'word', vectors=word_field.vocab.vectors)
+            word_cnn = model.CNN_Text(class_num=args.class_num,
+                                      kernel_num=args.word_kernel_num,
+                                      kernel_sizes=args.word_kernel_sizes,
+                                      embed_num=len(word_field.vocab), 
+                                      embed_dim=args.word_embed_dim, 
+                                      dropout=args.word_dropout,
+                                      conv_init='uniform',
+                                      fc_init='normal',
+                                      static=True,
+                                      vectors=word_field.vocab.vectors)
         elif args.snapshot is None and args.num_experts > 0:
-            word_cnn = [model.CNN_Text(args, 'word', vectors=word_field.vocab.vectors) for i in range(args.num_experts)]
+            word_cnn = [model.CNN_Text(class_num=args.class_num,
+                                       kernel_num=args.word_kernel_num,
+                                       kernel_sizes=args.word_kernel_sizes,
+                                       embed_num=len(word_field.vocab), 
+                                       embed_dim=args.word_embed_dim, 
+                                       dropout=args.word_dropout,
+                                       conv_init='uniform',
+                                       fc_init='normal',
+                                       static=True,
+                                       vectors=word_field.vocab.vectors)
+                        for i in range(args.num_experts)]
         else:
             print('\nLoading model from [%s]...' % args.snapshot)
             try:
