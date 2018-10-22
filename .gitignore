@@ -1,13 +1,25 @@
-#python package stuff
-
-build
+# python stuff
 dist
 *.egg-info
 __pycache__
+build
 
-#emacs junk
+# binaries
+model
+snapshot
+
+# emacs junk
 *~
 
-vpcnn/data/*trec*
-vpcnn/data/*shuffled*
-vpcnn/data/corrected-added.tsv
+# results
+**/*result.txt
+**/predictions*.txt
+
+# keep various incarnations of data out for now
+vpcnn/data/
+#vpcnn/data/*shuffled*
+vpcnn/data_phone
+# vpcnn/wilkins*
+
+# ancillary data
+w2v

@@ -4,7 +4,7 @@ import torch
 import torch.autograd as autograd
 import torch.nn.functional as F
 import copy
-from vpcnn.chatscript_file_generator import print_test_features
+from chatscript_file_generator import print_test_features
 
 def ensemble_predict(batch, models, args, **kwargs):
     for model in models:
@@ -89,7 +89,7 @@ def ensemble_eval(data_iter, models, args, **kwargs):
             feature, target = batch.text, batch.label
             feature.data.t_(), target.data.sub_(0)  # batch first, index align
             if args.cuda:
-                feature, target = feature.cuda(), target.cuda()
+                feature, target, model = feature.cuda(), target.cuda(), model.cuda()
 
             logit = model(feature) # log softmaxed
             loss = F.nll_loss(logit, target, size_average=False)

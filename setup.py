@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 #     long_description = f.read()
 
 setup(
-    name='vpcnn',
+    name='vp-cnn',
 
     version='0.0.1',
     description='Text CNNs for Virtual Patient question classification',
@@ -28,14 +28,14 @@ setup(
     packages=find_packages(),
     
     python_requires='>=3',
-    install_requires=['torch<=0.2', 'torchtext', 'numpy', 'tqdm'],
+    install_requires=['torch', 'torchtext', 'numpy', 'tqdm'],
 
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
 
     package_data={
-        'vpcnn': ['data/*'],
+        'vp-cnn': ['data/*'],
     },
 
 )
