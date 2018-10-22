@@ -2,7 +2,8 @@
 dist
 *.egg-info
 __pycache__
-build
+
+
 
 # binaries
 model
@@ -16,10 +17,12 @@ snapshot
 **/predictions*.txt
 
 # keep various incarnations of data out for now
-vpcnn/data/
-#vpcnn/data/*shuffled*
-vpcnn/data_phone
-# vpcnn/wilkins*
+
+
+vp-cnn/data
+vp-cnn/data_phone
+vp-cnn/wilkins*
+
 
 # ancillary data
 w2v
