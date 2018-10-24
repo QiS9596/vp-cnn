@@ -11,10 +11,10 @@ def ensemble_predict(batch, models, args, **kwargs):
         model.eval()
     logits = []
     confidences = []
-    feature, target = batch
+    feature, bound, target = batch
     for index, model in enumerate(models):
-        logit = model(feature) # log softmaxed
-        confidence = model.confidence(feature)
+        logit = model(feature, bound) # log softmaxed
+        confidence = model.confidence(feature, bound)
         logits.append(logit)
         confidences.append(confidence)
     total_logit = autograd.Variable(torch.zeros(logits[0].size()))
@@ -163,6 +163,9 @@ def train(train_iter, dev_iter, model, args, **kwargs):
         for batch in train_iter:
             feature, target = batch.text, batch.label
             feature.data.t_(), target.data.sub_(0)  # batch first, index align
+            if args.two_ch:
+                bounds = batch.bounds
+                bounds.data.t_()
             # print(feature)
             # print(train_iter.data().fields['text'].vocab.stoi)
             if args.cuda:
@@ -170,7 +173,10 @@ def train(train_iter, dev_iter, model, args, **kwargs):
             assert feature.volatile is False and target.volatile is False
             # print(feature, target)
             optimizer.zero_grad()
-            logit = model(feature)
+            if args.two_ch:
+                logit = model(feature, bounds)
+            else:
+                logit = model(feature)
             loss = F.nll_loss(logit, target)
             loss.backward()
             optimizer.step()
@@ -290,6 +296,12 @@ def train_final_ensemble(char_train_data, char_dev_data, word_train_data, word_d
             char_feature.data.t_()
             word_feature, word_target = word_batch.text, word_batch.label
             word_feature.data.t_()
+            bound_feature = None
+            if args.two_ch:
+                bound_feature = char_batch.bounds
+                bound_feature.data.t_()
+                if args.cuda:
+                    bound_feature = bound_feature.cuda()
 
             if args.cuda:
                 char_feature, char_target = char_feature.cuda(), char_target.cuda()
@@ -298,11 +310,11 @@ def train_final_ensemble(char_train_data, char_dev_data, word_train_data, word_d
             assert torch.equal(char_target.data, word_target.data), "Mismatching data sample! {}, {}".format(char_target.data,
                                                                                                         word_target.data)
             if args.num_experts == 0:
-                char_output = char_model(char_feature)
+                char_output = char_model(char_feature, bound_feature)
                 word_output = word_model(word_feature)
             else:
-                char_train_tensors = (char_feature, char_target)
-                word_train_tensors = (word_feature, word_target)
+                char_train_tensors = (char_feature, bound_feature, char_target)
+                word_train_tensors = (word_feature, None, word_target)
                 char_output, _ = ensemble_predict(char_train_tensors, char_model, args)
                 word_output, _ = ensemble_predict(word_train_tensors, word_model, args)
 
@@ -358,6 +370,12 @@ def eval_final_ensemble(char_data, word_data, char_model, word_model, last_ensem
         char_feature.data.t_()  # batch first, index align
         char_feature.volatile = True
 
+        bound_feature = None
+        if args.two_ch:
+            bound_feature = char_batch.bounds
+            bound_feature.data.t_()
+            bound_feature.volatile = True
+
         word_feature, word_target = word_batch.text, word_batch.label
         word_feature.data.t_() # batch first, index align
         word_feature.volatile = True
@@ -365,14 +383,16 @@ def eval_final_ensemble(char_data, word_data, char_model, word_model, last_ensem
         if args.cuda:
             char_feature, char_target = char_feature.cuda(), char_target.cuda()
             word_feature, word_target = word_feature.cuda(), word_target.cuda()
+            if args.two_ch:
+                bound_feature = bound_feature.cuda()
         assert torch.equal(char_target.data, word_target.data), "Mismatching data sample! {}, {}".format(char_target.data, word_target.data)
 
         if args.num_experts == 0:
-            char_output = char_model(char_feature)
+            char_output = char_model(char_feature, bound_feature)
             word_output = word_model(word_feature)
         else:
-            char_tensors = (char_feature, char_target)
-            word_tensors = (word_feature, word_target)
+            char_tensors = (char_feature, bound_feature, char_target)
+            word_tensors = (word_feature, None, word_target)
             char_output, (char_confidence, char_ave_probs, char_ave_logprobs) = ensemble_predict(char_tensors, char_model, args)
             word_output, (word_confidence, word_ave_probs, word_ave_logprobs) = ensemble_predict(word_tensors, word_model, args)
         # print(char_output)

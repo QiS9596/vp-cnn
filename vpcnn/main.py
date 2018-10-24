@@ -41,6 +41,7 @@ parser.add_argument('-save-dir', type=str, default='snapshot', help='where to sa
 # data 
 parser.add_argument('-data-dir', type=str, default='./data/', help='directory containing data files')
 parser.add_argument('-idx-file', type=str, default='wilkins.shuffled.30.indices', help='file containing dial,turn idxs corresponding to train-file entries, in order, in `data-dir`')
+parser.add_argument('-two-ch', action='store_true', help='use two-channel boundary/phone model, when supplying appropriate data')
 parser.add_argument('-char-train-file', type=str, default='wilkins.phone.shuffled.30.txt', help='file containing char data for training, in `data-dir`')
 parser.add_argument('-word-train-file', type=str, default='wilkins.word.shuffled.30.txt', help='file containing word data for training, in `data-dir`')
 parser.add_argument('-char-test-file', type=str, default=None, help='file containing char data for testing, in `data-dir`')
@@ -134,10 +135,21 @@ def mr(text_field, label_field, **kargs):
 
 
 # load VP dataset
-def vp(text_field, label_field, foldid, path=None, filename=None, test_filename=None, train_idxs=None, alt_file=None, alt_p=0.0, num_experts=0, **kargs):
+def vp(text_field, label_field, foldid, bound_field=None, path=None, filename=None, 
+       test_filename=None, label_filename=None, train_idxs=None, alt_file=None, alt_p=0.0, num_experts=0, **kargs):
     # print('num_experts', num_experts)
-    train_data, dev_data, test_data = vpdataset.VP.splits(text_field, label_field, root=path, filename=filename, test_filename=test_filename, 
-                                                          train_idxs=train_idxs, alt_file=alt_file, alt_p=alt_p, foldid=foldid, num_experts=num_experts)
+    train_data, dev_data, test_data = vpdataset.VP.splits(text_field, 
+                                                          label_field, 
+                                                          bound_field=bound_field, 
+                                                          root=path, 
+                                                          filename=filename, 
+                                                          test_filename=test_filename, 
+                                                          label_filename=label_filename, 
+                                                          train_idxs=train_idxs, 
+                                                          alt_file=alt_file, 
+                                                          alt_p=alt_p, 
+                                                          foldid=foldid, 
+                                                          num_experts=num_experts)
     alt_list = None
     alt_dict = None
 
@@ -152,6 +164,9 @@ def vp(text_field, label_field, foldid, path=None, filename=None, test_filename=
 
     if alt_dict is not None:
         alt_list = [alt for key in alt_dict for alt in alt_dict[key]]
+        print(alt_list[:10])
+        if bound_field is not None:
+            alt_list = [vpdataset.split_bounds(alt)[0] for alt in alt_list]
 
     if alt_list is None:
         text_field.build_vocab(train_vocab, dev_vocab, test_data, wv_type=kargs["wv_type"], wv_dim=kargs["wv_dim"],
@@ -159,6 +174,9 @@ def vp(text_field, label_field, foldid, path=None, filename=None, test_filename=
     else:
         text_field.build_vocab(train_vocab, dev_vocab, test_data, alt_list, wv_type=kargs["wv_type"], wv_dim=kargs["wv_dim"],
                                wv_dir=kargs["wv_dir"], min_freq=kargs['min_freq'])
+
+    if bound_field is not None:
+        bound_field.build_vocab(train_vocab, dev_vocab, test_data)
         
     # label_field.build_vocab(train_data, dev_data, test_data)
     kargs.pop('wv_type')
@@ -190,6 +208,8 @@ def char_tokenizer(mstring):
     return mstring.split()
 #    return list(mstring)
 
+def bound_tokenizer(mstring):
+    return mstring.split()
 
 def check_vocab(field):
     itos = field.vocab.itos
@@ -234,6 +254,8 @@ word_file = args.word_train_file
 phn_file = args.char_train_file
 word_test_file = args.word_test_file
 phn_test_file = args.char_test_file
+phn_labels = 'phn+bd_labels.txt' if args.two_ch else 'phn_labels.txt'
+word_labels = 'labels.txt'
 use_char = args.no_char
 use_word = args.no_word
 
@@ -243,17 +265,26 @@ for xfold in range(args.xfolds):
     print("\nLoading data...")
 
     tokenizer = data.Pipeline(vpdataset.clean_str)
+
     text_field = data.Field(lower=True, tokenize=char_tokenizer)
     word_field = data.Field(lower=True, tokenize=tokenizer)
     label_field = data.Field(sequential=False, use_vocab=False, preprocessing=int)
+
+    if args.two_ch:
+        bound_field = data.Field(lower=True, tokenize=bound_tokenizer)
+    else:
+        bound_field = None
+
 
     if use_char:
         print(phn_file)
         train_iter, dev_iter, test_iter = vp(text_field, 
                                              label_field, 
+                                             bound_field=bound_field,
                                              path=data_dir, 
                                              filename=phn_file,
                                              test_filename=phn_test_file,
+                                             label_filename=phn_labels,
                                              train_idxs=dialogues,
                                              alt_file=args.char_alt_file,
                                              alt_p=args.alt_prob,
@@ -273,6 +304,7 @@ for xfold in range(args.xfolds):
                                                             path=data_dir, 
                                                             filename=word_file,
                                                             test_filename=word_test_file,
+                                                            label_filename=word_labels,
                                                             train_idxs=dialogues,
                                                             alt_file=args.word_alt_file,
                                                             alt_p=args.alt_prob,
@@ -313,7 +345,10 @@ for xfold in range(args.xfolds):
         args.max_norm = args.char_max_norm
         args.kernel_num = args.char_kernel_num
         args.optimizer = args.char_optimizer
-
+        if args.two_ch:
+            V_bd = len(bound_field.vocab)
+        else:
+            V_bd = 1
         print("\nParameters:")
         for attr, value in sorted(args.__dict__.items()):
             print("  {}={}".format(attr.upper(), value))
@@ -323,22 +358,26 @@ for xfold in range(args.xfolds):
                                       kernel_num=args.char_kernel_num,
                                       kernel_sizes=args.char_kernel_sizes,
                                       embed_num=len(text_field.vocab), 
+                                      embed2_num=V_bd,
                                       embed_dim=args.char_embed_dim, 
                                       dropout=args.char_dropout,
                                       conv_init='uniform',
                                       fc_init='normal',
                                       static=False,
+                                      two_ch=args.two_ch,
                                       vectors=None)
         elif args.snapshot is None and args.num_experts > 0:
             char_cnn = [model.CNN_Text(class_num=args.class_num,
                                        kernel_num=args.char_kernel_num,
                                        kernel_sizes=args.char_kernel_sizes,
                                        embed_num=len(text_field.vocab), 
+                                       embed2_num=V_bd,
                                        embed_dim=args.char_embed_dim, 
                                        dropout=args.char_dropout,
                                        conv_init='uniform',
                                        fc_init='normal',
                                        static=False,
+                                       two_ch=args.two_ch,
                                        vectors=None)
                         for i in range(args.num_experts)]
         else:
@@ -457,18 +496,43 @@ for xfold in range(args.xfolds):
                 print("Sorry, This snapshot doesn't exist.");
                 exit()
 
-        train_iter, dev_iter, test_iter = vp(text_field, label_field, path=data_dir, filename=phn_file, test_filename=phn_test_file,
-                                             train_idxs=dialogues, alt_file=args.char_alt_file, alt_p=args.alt_prob,
-                                             foldid=None if no_test_split else xfold, device=args.device, repeat=False,
-                                             shuffle=False, sort=False
-                                             , wv_type=None, wv_dim=None, wv_dir=None, min_freq=1)
-        train_iter_word, dev_iter_word, test_iter_word = vp(word_field, label_field, path=data_dir, filename=word_file, test_filename=word_test_file,
-                                                            train_idxs=dialogues, alt_file=args.word_alt_file, alt_p=args.alt_prob,
+        train_iter, dev_iter, test_iter = vp(text_field, 
+                                             label_field, 
+                                             bound_field=bound_field, 
+                                             path=data_dir, 
+                                             filename=phn_file, 
+                                             test_filename=phn_test_file,
+                                             label_filename=phn_labels,
+                                             train_idxs=dialogues, 
+                                             alt_file=args.char_alt_file, 
+                                             alt_p=args.alt_prob,
+                                             foldid=None if no_test_split else xfold, 
+                                             device=args.device, 
+                                             repeat=False,
+                                             shuffle=False, 
+                                             sort=False, 
+                                             wv_type=None, 
+                                             wv_dim=None, 
+                                             wv_dir=None, 
+                                             min_freq=1)
+                                             
+        train_iter_word, dev_iter_word, test_iter_word = vp(word_field, 
+                                                            label_field, 
+                                                            path=data_dir, 
+                                                            filename=word_file, 
+                                                            test_filename=word_test_file,
+                                                            label_filename=word_labels,
+                                                            train_idxs=dialogues, 
+                                                            alt_file=args.word_alt_file, 
+                                                            alt_p=args.alt_prob,
                                                             foldid=None if no_test_split else xfold,
                                                             device=args.device,
-                                                            repeat=False, sort=False, shuffle=False,
+                                                            repeat=False, 
+                                                            sort=False, 
+                                                            shuffle=False,
                                                             wv_type=args.word_vector,
-                                                            wv_dim=args.word_embed_dim, wv_dir=args.emb_path,
+                                                            wv_dim=args.word_embed_dim, 
+                                                            wv_dir=args.emb_path,
                                                             min_freq=args.min_freq)
 
         acc = train.train_final_ensemble(train_iter, dev_iter, train_iter_word, dev_iter_word, char_cnn, word_cnn, final_logit,

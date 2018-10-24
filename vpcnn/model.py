@@ -10,7 +10,8 @@ class CNN_Text(nn.Module):
                  class_num=None,
                  kernel_num=None,
                  kernel_sizes=None,
-                 embed_num=None, 
+                 embed_num=None,
+                 embed2_num=2,
                  embed_dim=None, 
                  dropout=0.5,
                  conv_init='default',
@@ -31,6 +32,7 @@ class CNN_Text(nn.Module):
             raise TypeError("Required keyword argument not provided")
 
         V = embed_num
+        V2 = embed2_num
         D = embed_dim
         C = class_num
         Ci = 2 if two_ch else 1
@@ -38,6 +40,7 @@ class CNN_Text(nn.Module):
         Ks = kernel_sizes
 
         self.embed = nn.Embedding(V, D) #, padding_idx=1)
+        self.embed2 = nn.Embedding(V2, D)
         self.convs1 = nn.ModuleList([nn.Conv2d(Ci, Co, (K, D)) for K in Ks])
 
         if vectors is not None:
@@ -85,19 +88,26 @@ class CNN_Text(nn.Module):
         x = F.max_pool1d(x, x.size(2)).squeeze(2)
         return x
 
-    def forward(self, x):
-        x = self.confidence(x)
+    def forward(self, x, y = None):
+        x = self.confidence(x, y)
         logit = F.log_softmax(x) # (N,C)
         return logit
 
-    def confidence(self, x):
+    def confidence(self, x, y):
         x = self.embed(x)  # (N,W,D)
+        x = x.unsqueeze(1)  # (N,Ci,W,D)
+        if self.two_ch:
+            if y is not None:
+                y = self.embed2(y)
+                y = y.unsqueeze(1)
+                x = torch.stack([x, y], dim=1)
+            else:
+                raise ValueError("two-channel model requires two inputs")
 
         if self.static:
             # default initialize to requires_grad=False
             x = autograd.Variable(x.data)
 
-        x = x.unsqueeze(1)  # (N,Ci,W,D)
         x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]  # [(N,Co,W), ...]*len(Ks)
         # print([x_p.size() for x_p in x])
 

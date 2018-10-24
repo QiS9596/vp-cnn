@@ -31,10 +31,10 @@ def main(data_file, dialogue_file, shuffled_data_file, indices_file, dataset2 = 
 if __name__ == '__main__':
     dialogue_file = 'corrected.tsv'
     data_file = 'vp16.base.stripped.lbl_in.tsv'
-    data2_file = 'vp16.base.stripped.lbl_bd_phn.tsv'
+    data2_file = 'vp16.base.stripped.lbl_phn+bd.tsv'
     a = random.randint(0, 100)
     shuffled_data_file = 'vp16.base.word.shuffled.'+str(a)+'.txt'
-    shuffled_data2_file = 'vp16.base.bd_phn.shuffled.'+str(a)+'.txt'
+    shuffled_data2_file = 'vp16.base.phn+bd.shuffled.'+str(a)+'.txt'
     indices_file = 'vp16.base.shuffled.'+str(a)+'.indices'
     main(data_file, dialogue_file,shuffled_data_file, indices_file, 
          dataset2=data2_file, 
