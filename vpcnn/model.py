@@ -95,14 +95,14 @@ class CNN_Text(nn.Module):
 
     def confidence(self, x, y):
         x = self.embed(x)  # (N,W,D)
-        x = x.unsqueeze(1)  # (N,Ci,W,D)
         if self.two_ch:
             if y is not None:
                 y = self.embed2(y)
-                y = y.unsqueeze(1)
                 x = torch.stack([x, y], dim=1)
             else:
                 raise ValueError("two-channel model requires two inputs")
+        else:
+            x = x.unsqueeze(1)  # (N,Ci,W,D)
 
         if self.static:
             # default initialize to requires_grad=False

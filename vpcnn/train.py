@@ -88,10 +88,16 @@ def ensemble_eval(data_iter, models, args, **kwargs):
         for batch in data_iter: # should be only 1 batch
             feature, target = batch.text, batch.label
             feature.data.t_(), target.data.sub_(0)  # batch first, index align
+            if args.two_ch:
+                bounds = batch.bounds
+                bounds.data.t_()
             if args.cuda:
                 feature, target, model = feature.cuda(), target.cuda(), model.cuda()
-
-            logit = model(feature) # log softmaxed
+                if args.two_ch: bounds = bounds.cuda()
+            if args.two_ch:
+                logit = model(feature, bounds)
+            else:
+                logit = model(feature) # log softmaxed
             loss = F.nll_loss(logit, target, size_average=False)
 
             avg_loss = loss.data[0]
@@ -170,6 +176,7 @@ def train(train_iter, dev_iter, model, args, **kwargs):
             # print(train_iter.data().fields['text'].vocab.stoi)
             if args.cuda:
                 feature, target = feature.cuda(), target.cuda()
+                if args.two_ch: bounds = bounds.cuda()
             assert feature.volatile is False and target.volatile is False
             # print(feature, target)
             optimizer.zero_grad()
@@ -230,10 +237,17 @@ def eval(data_iter, model, args, **kwargs):
     for batch in data_iter:
         feature, target = batch.text, batch.label
         feature.data.t_(), target.data.sub_(0)  # batch first, index align
+        if args.two_ch:
+            bounds = batch.bounds
+            bounds.data.t_()
         if args.cuda:
             feature, target = feature.cuda(), target.cuda()
+            if args.two_ch: bounds = bounds.cuda()
 
-        logit = model(feature)
+        if args.two_ch:
+            logit = model(feature, bounds)
+        else:
+            logit = model(feature)
         loss = F.nll_loss(logit, target, size_average=False)
 
         avg_loss += loss.data[0]
