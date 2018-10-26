@@ -87,7 +87,7 @@ class VP(data.Dataset):
                 return gold
             else:
                 # sample with np.random.choice
-                alt = self.rng.choices(self.alt_dict[key], weights=self.prob_dict[key])
+                alt = self.rng.choices(self.alt_dict[key], weights=self.prob_dict[key])[0]
                 if self.two_ch:
                     alt, bounds = split_bounds(alt)
                 ex = [alt, gold.label]

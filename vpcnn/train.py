@@ -61,7 +61,7 @@ def ensemble_predict(batch, models, args, **kwargs):
 
     return total_logit, (total_confidence, average_probs, average_logprobs)
 
-def ensemble_train(trains, devs, models, args, **kwargs):
+def ensemble_train(trains, devs, models, args, two_ch=False, **kwargs):
     print('entering ensemble training:')
     acc_list = []
     for i in range(len(trains)):
@@ -69,7 +69,7 @@ def ensemble_train(trains, devs, models, args, **kwargs):
         model = models[i]
         if args.cuda:
             model.cuda()
-        acc, model = train(trains[i], devs[i], model, args,**kwargs)
+        acc, model = train(trains[i], devs[i], model, args, two_ch=two_ch, **kwargs)
         models[i] = model
         acc_list.append(acc)
         if not os.path.isdir(args.save_dir): os.makedirs(args.save_dir)
@@ -78,7 +78,7 @@ def ensemble_train(trains, devs, models, args, **kwargs):
         torch.save(model.state_dict(), save_path)
     return acc_list, models
 
-def ensemble_eval(data_iter, models, args, **kwargs):
+def ensemble_eval(data_iter, models, args, two_ch=False, **kwargs):
     for model in models:
         model.eval()
     corrects, avg_loss = [], []
@@ -88,13 +88,13 @@ def ensemble_eval(data_iter, models, args, **kwargs):
         for batch in data_iter: # should be only 1 batch
             feature, target = batch.text, batch.label
             feature.data.t_(), target.data.sub_(0)  # batch first, index align
-            if args.two_ch:
+            if two_ch:
                 bounds = batch.bounds
                 bounds.data.t_()
             if args.cuda:
                 feature, target, model = feature.cuda(), target.cuda(), model.cuda()
-                if args.two_ch: bounds = bounds.cuda()
-            if args.two_ch:
+                if two_ch: bounds = bounds.cuda()
+            if two_ch:
                 logit = model(feature, bounds)
             else:
                 logit = model(feature) # log softmaxed
@@ -149,7 +149,7 @@ def ensemble_eval(data_iter, models, args, **kwargs):
         print('Evaluation ensemble {} - acc: {:.4f}%({}/{})'.format(args.ensemble.upper(), accuracy, corrects, size), file=kwargs['log_file_handle'])
     return accuracy
 
-def train(train_iter, dev_iter, model, args, **kwargs):
+def train(train_iter, dev_iter, model, args, two_ch=False, **kwargs):
     if args.cuda:
         model.cuda()
     if args.optimizer == 'adam':
@@ -169,18 +169,18 @@ def train(train_iter, dev_iter, model, args, **kwargs):
         for batch in train_iter:
             feature, target = batch.text, batch.label
             feature.data.t_(), target.data.sub_(0)  # batch first, index align
-            if args.two_ch:
+            if two_ch:
                 bounds = batch.bounds
                 bounds.data.t_()
             # print(feature)
             # print(train_iter.data().fields['text'].vocab.stoi)
             if args.cuda:
                 feature, target = feature.cuda(), target.cuda()
-                if args.two_ch: bounds = bounds.cuda()
+                if two_ch: bounds = bounds.cuda()
             assert feature.volatile is False and target.volatile is False
             # print(feature, target)
             optimizer.zero_grad()
-            if args.two_ch:
+            if two_ch:
                 logit = model(feature, bounds)
             else:
                 logit = model(feature)
@@ -222,29 +222,29 @@ def train(train_iter, dev_iter, model, args, **kwargs):
             #    save_prefix = os.path.join(args.save_dir, 'snapshot')
             #    save_path = '{}_steps{}.pt'.format(save_prefix, steps)
             #    torch.save(model.state_dict(), save_path)
-        acc = eval(dev_iter, model, args, **kwargs)
+        acc = eval(dev_iter, model, args, two_ch=two_ch, **kwargs)
         if acc > best_acc:
             best_acc = acc
             best_model = copy.deepcopy(model)
         # print(model.embed.weight[100])
     model = best_model
-    acc = eval(dev_iter, model, args, **kwargs)
+    acc = eval(dev_iter, model, args, two_ch=two_ch, **kwargs)
     return acc, model
 
-def eval(data_iter, model, args, **kwargs):
+def eval(data_iter, model, args, two_ch=False, **kwargs):
     model.eval()
     corrects, avg_loss = 0, 0
     for batch in data_iter:
         feature, target = batch.text, batch.label
         feature.data.t_(), target.data.sub_(0)  # batch first, index align
-        if args.two_ch:
+        if two_ch:
             bounds = batch.bounds
             bounds.data.t_()
         if args.cuda:
             feature, target = feature.cuda(), target.cuda()
-            if args.two_ch: bounds = bounds.cuda()
+            if two_ch: bounds = bounds.cuda()
 
-        if args.two_ch:
+        if two_ch:
             logit = model(feature, bounds)
         else:
             logit = model(feature)
@@ -282,7 +282,7 @@ def predict(text, model, text_field, label_feild):
     _, predicted = torch.max(output, 1)
     return label_feild.vocab.itos[predicted.data[0][0]+1]
 
-def train_final_ensemble(char_train_data, char_dev_data, word_train_data, word_dev_data, char_model, word_model, last_ensemble_model, args, **kwargs):
+def train_final_ensemble(char_train_data, char_dev_data, word_train_data, word_dev_data, char_model, word_model, last_ensemble_model, args, two_ch=False, **kwargs):
     if args.cuda:
         last_ensemble_model.cuda()
     if not args.fine_tune:
@@ -311,7 +311,7 @@ def train_final_ensemble(char_train_data, char_dev_data, word_train_data, word_d
             word_feature, word_target = word_batch.text, word_batch.label
             word_feature.data.t_()
             bound_feature = None
-            if args.two_ch:
+            if two_ch:
                 bound_feature = char_batch.bounds
                 bound_feature.data.t_()
                 if args.cuda:
@@ -329,8 +329,8 @@ def train_final_ensemble(char_train_data, char_dev_data, word_train_data, word_d
             else:
                 char_train_tensors = (char_feature, bound_feature, char_target)
                 word_train_tensors = (word_feature, None, word_target)
-                char_output, _ = ensemble_predict(char_train_tensors, char_model, args)
-                word_output, _ = ensemble_predict(word_train_tensors, word_model, args)
+                char_output, _ = ensemble_predict(char_train_tensors, char_model, args, two_ch=two_ch)
+                word_output, _ = ensemble_predict(word_train_tensors, word_model, args, two_ch=False)
 
             if not args.fine_tune:
                 char_output = autograd.Variable(char_output.data)
@@ -362,7 +362,7 @@ def train_final_ensemble(char_train_data, char_dev_data, word_train_data, word_d
                                                                              accuracy,
                                                                              corrects,
                                                                            char_batch.batch_size), file=kwargs['log_file_handle'])
-                eval_final_ensemble(char_dev_data, word_dev_data, char_model, word_model, last_ensemble_model, args, **kwargs)
+                eval_final_ensemble(char_dev_data, word_dev_data, char_model, word_model, last_ensemble_model, args, two_ch=two_ch, **kwargs)
             #if steps % args.save_interval == 0:
             #    if not os.path.isdir(args.save_dir): os.makedirs(args.save_dir)
             #    save_prefix = os.path.join(args.save_dir, 'snapshot')
@@ -373,10 +373,10 @@ def train_final_ensemble(char_train_data, char_dev_data, word_train_data, word_d
     save_path = '{}model.0.pt'.format(save_prefix)
     torch.save(last_ensemble_model.state_dict(), save_path)
 
-    acc = eval_final_ensemble(char_dev_data, word_dev_data, char_model, word_model, last_ensemble_model, args, **kwargs)
+    acc = eval_final_ensemble(char_dev_data, word_dev_data, char_model, word_model, last_ensemble_model, args, two_ch=two_ch, **kwargs)
     return acc
 
-def eval_final_ensemble(char_data, word_data, char_model, word_model, last_ensemble_model, args, **kwargs):
+def eval_final_ensemble(char_data, word_data, char_model, word_model, last_ensemble_model, args, two_ch=False, **kwargs):
     last_ensemble_model.eval()
     corrects, avg_loss = 0, 0
     for char_batch, word_batch in zip(char_data, word_data):
@@ -385,7 +385,7 @@ def eval_final_ensemble(char_data, word_data, char_model, word_model, last_ensem
         char_feature.volatile = True
 
         bound_feature = None
-        if args.two_ch:
+        if two_ch:
             bound_feature = char_batch.bounds
             bound_feature.data.t_()
             bound_feature.volatile = True
@@ -397,7 +397,7 @@ def eval_final_ensemble(char_data, word_data, char_model, word_model, last_ensem
         if args.cuda:
             char_feature, char_target = char_feature.cuda(), char_target.cuda()
             word_feature, word_target = word_feature.cuda(), word_target.cuda()
-            if args.two_ch:
+            if two_ch:
                 bound_feature = bound_feature.cuda()
         assert torch.equal(char_target.data, word_target.data), "Mismatching data sample! {}, {}".format(char_target.data, word_target.data)
 

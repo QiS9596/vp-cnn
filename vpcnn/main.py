@@ -164,7 +164,7 @@ def vp(text_field, label_field, foldid, bound_field=None, path=None, filename=No
 
     if alt_dict is not None:
         alt_list = [alt for key in alt_dict for alt in alt_dict[key]]
-        print(alt_list[:10])
+        #print(alt_list[:10])
         if bound_field is not None:
             alt_list = [vpdataset.split_bounds(alt)[0] for alt in alt_list]
 
@@ -388,18 +388,18 @@ for xfold in range(args.xfolds):
                 print("Sorry, This snapshot doesn't exist.");
                 exit()
         if args.num_experts > 0:
-            acc, char_cnn = train.ensemble_train(train_iter, dev_iter, char_cnn, args,
+            acc, char_cnn = train.ensemble_train(train_iter, dev_iter, char_cnn, args, two_ch=args.two_ch,
                                                  log_file_handle=log_file_handle, always_norm=False)
         else:
-            acc, char_cnn = train.train(train_iter, dev_iter, char_cnn, args, log_file_handle=log_file_handle)
+            acc, char_cnn = train.train(train_iter, dev_iter, char_cnn, args, two_ch=args.two_ch, log_file_handle=log_file_handle)
         char_dev_fold_accuracies.append(acc)
         print("Completed fold {0}. Accuracy on Dev: {1} for CHAR".format(xfold, acc), file=log_file_handle)
         print("Completed fold {0}. Mean accuracy on Dev: {1} for CHAR".format(xfold, np.mean(acc)), file=log_file_handle)
         if args.eval_on_test:
             if args.num_experts > 0:
-                result = train.ensemble_eval(test_iter, char_cnn, args, log_file_handle=log_file_handle)
+                result = train.ensemble_eval(test_iter, char_cnn, args, two_ch=args.two_ch, log_file_handle=log_file_handle)
             else:
-                result = train.eval(test_iter, char_cnn, args, log_file_handle=log_file_handle)
+                result = train.eval(test_iter, char_cnn, args, two_ch=args.two_ch, log_file_handle=log_file_handle)
             char_test_fold_accuracies.append(result)
             print("Completed fold {0}. Accuracy on Test: {1} for CHAR".format(xfold, result))
             print("Completed fold {0}. Accuracy on Test: {1} for CHAR".format(xfold, result), file=log_file_handle)
@@ -536,11 +536,11 @@ for xfold in range(args.xfolds):
                                                             min_freq=args.min_freq)
 
         acc = train.train_final_ensemble(train_iter, dev_iter, train_iter_word, dev_iter_word, char_cnn, word_cnn, final_logit,
-                                         args, log_file_handle=log_file_handle)
+                                         args, two_ch=args.two_ch, log_file_handle=log_file_handle)
         ensemble_dev_fold_accuracies.append(acc)
         print("Completed fold {0}. Accuracy on Dev: {1} for LOGIT".format(xfold, acc), file=log_file_handle)
         if args.eval_on_test:
-            result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
+            result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args, two_ch=args.two_ch,
                                                log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
                                                labels=labels, chats=chats, dialogues=dialogues, indices=indices, fold_id=xfold)
             ensemble_test_fold_accuracies.append(result)
