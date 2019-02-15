@@ -205,8 +205,8 @@ def vp(text_field, label_field, foldid, bound_field=None, path=None, filename=No
 
 
 def char_tokenizer(mstring):
-    return mstring.split()
-#    return list(mstring)
+#    return mstring.split()
+    return list(mstring)
 
 def bound_tokenizer(mstring):
     return mstring.split()
@@ -254,7 +254,11 @@ word_file = args.word_train_file
 phn_file = args.char_train_file
 word_test_file = args.word_test_file
 phn_test_file = args.char_test_file
-phn_labels = 'phn+bd_labels.txt' if args.two_ch else 'phn_labels.txt'
+#TODO FIXME
+#this should not be hardcoded (missing plain phn_labels.txt option in current state)
+#phn_labels = 'phn+bd_labels.txt' if args.two_ch else 'phn_labels.txt'
+# and now this is another dumb temporary hack for a char run
+phn_labels = 'labels.txt'
 word_labels = 'labels.txt'
 use_char = args.no_char
 use_word = args.no_word
