@@ -1,8 +1,13 @@
 #python package stuff
 
+build
 dist
 *.egg-info
 vpcnn/__pycache__
 
 #emacs junk
 *~
+
+vpcnn/data/*trec*
+vpcnn/data/*shuffled*
+vpcnn/data/corrected-added.tsv
