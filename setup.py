@@ -10,7 +10,7 @@ from setuptools import setup, find_packages
 #     long_description = f.read()
 
 setup(
-    name='vpcnn',
+    name='vp-cnn',
 
     version='0.0.1',
     description='Text CNNs for Virtual Patient question classification',
@@ -35,7 +35,7 @@ setup(
     # have to be included in MANIFEST.in as well.
 
     package_data={
-        'vpcnn': ['data/*'],
+        'vp-cnn': ['data/*'],
     },
 
 )

@@ -6,51 +6,81 @@ from torch import autograd
 
 class CNN_Text(nn.Module):
     
-    def __init__(self, args, char_or_word, vectors=None):
+    def __init__(self, 
+                 class_num=None,
+                 kernel_num=None,
+                 kernel_sizes=None,
+                 embed_num=None,
+                 embed2_num=2,
+                 embed_dim=None, 
+                 dropout=0.5,
+                 conv_init='default',
+                 fc_init='default',
+                 two_ch=False,
+                 static=False,
+                 vectors=None):
         super(CNN_Text,self).__init__()
-        self.args = args
         
-        V = args.embed_num
-        if char_or_word == 'char':
-            D = args.char_embed_dim
-        else:
-            D = args.word_embed_dim
-        C = args.class_num
-        Ci = 1
-        Co = args.kernel_num
-        if char_or_word == 'char':
-            Ks = args.char_kernel_sizes
-        else:
-            Ks = args.word_kernel_sizes
+        self.static = static
+        self.two_ch = two_ch
+        
+        if (embed_num is None or 
+            embed_dim is None or 
+            class_num is None or 
+            kernel_sizes is None or 
+            kernel_num is None):
+            raise TypeError("Required keyword argument not provided")
 
-        self.embed = nn.Embedding(V, D, padding_idx=1)
-        if char_or_word != 'char' and vectors is not None:
+        V = embed_num
+        V2 = embed2_num
+        D = embed_dim
+        C = class_num
+        Ci = 2 if two_ch else 1
+        Co = kernel_num
+        Ks = kernel_sizes
+
+        self.embed = nn.Embedding(V, D) #, padding_idx=1)
+        self.embed2 = nn.Embedding(V2, D)
+        self.convs1 = nn.ModuleList([nn.Conv2d(Ci, Co, (K, D)) for K in Ks])
+
+        if vectors is not None:
             self.embed.weight.data = vectors
 
-        # print(self.embed.weight.data[100])
-        # print(self.embed.weight.data.size())
-        self.convs1 = nn.ModuleList([nn.Conv2d(Ci, Co, (K, D)) for K in Ks])
-        if char_or_word == 'word':
-            for layer in self.convs1:
-                if args.ortho_init == True:
-                    init.orthogonal(layer.weight.data)
-                else:
-                    layer.weight.data.uniform_(-0.01, 0.01)
+        for layer in self.convs1:
+            if conv_init == 'ortho':
+                init.orthogonal(layer.weight.data)
                 layer.bias.data.zero_()
+            elif conv_init == 'uniform':
+                layer.weight.data.uniform_(-0.01, 0.01)
+                layer.bias.data.zero_()
+            elif conv_init == 'default':
+                # nothing to do, it's already initialized
+                # (but still wanted to check that a valid
+                # option was passed).
+                pass 
+            else:
+                raise ValueError("Unknown initialization option")
         '''
         self.conv13 = nn.Conv2d(Ci, Co, (3, D))
         self.conv14 = nn.Conv2d(Ci, Co, (4, D))
         self.conv15 = nn.Conv2d(Ci, Co, (5, D))
         '''
-        self.dropout = nn.Dropout(args.dropout)
+        self.dropout = nn.Dropout(dropout)
         self.fc1 = nn.Linear(len(Ks)*Co, C)
-        if char_or_word == 'word':
-            if args.ortho_init == True:
-                init.orthogonal(self.fc1.weight.data)
-            else:
-                init.normal(self.fc1.weight.data)
-                self.fc1.weight.data.mul_(0.01)
+        if fc_init == 'ortho':
+            init.orthogonal(self.fc1.weight.data)
             self.fc1.bias.data.zero_()
+        elif fc_init == 'normal':
+            init.normal(self.fc1.weight.data)
+            self.fc1.weight.data.mul_(0.01)
+            self.fc1.bias.data.zero_()
+        elif fc_init == 'default':
+            # nothing to do, it's already initialized
+            # (but still wanted to check that a valid
+            # option was passed).
+            pass 
+        else:
+            raise ValueError("Unknown initialization option")
         # print(V, D, C, Ci, Co, Ks, self.convs1, self.fc1)
 
     def conv_and_pool(self, x, conv):
@@ -58,18 +88,26 @@ class CNN_Text(nn.Module):
         x = F.max_pool1d(x, x.size(2)).squeeze(2)
         return x
 
-    def forward(self, x):
-        x = self.confidence(x)
+    def forward(self, x, y = None):
+        x = self.confidence(x, y)
         logit = F.log_softmax(x) # (N,C)
         return logit
 
-    def confidence(self, x):
+    def confidence(self, x, y):
         x = self.embed(x)  # (N,W,D)
+        if self.two_ch:
+            if y is not None:
+                y = self.embed2(y)
+                x = torch.stack([x, y], dim=1)
+            else:
+                raise ValueError("two-channel model requires two inputs")
+        else:
+            x = x.unsqueeze(1)  # (N,Ci,W,D)
 
-        if self.args.static and self.args.word_vector:
+        if self.static:
+            # default initialize to requires_grad=False
             x = autograd.Variable(x.data)
 
-        x = x.unsqueeze(1)  # (N,Ci,W,D)
         x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]  # [(N,Co,W), ...]*len(Ks)
         # print([x_p.size() for x_p in x])
 
