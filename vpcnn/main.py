@@ -142,7 +142,7 @@ def mr(text_field, label_field, **kargs):
         **kargs)
     return train_iter, dev_iter
 
-test_batch_size = args.batch_size if no_test_split else len(test_data)
+test_batch_size = args.batch_size
 
 # load VP dataset
 
@@ -161,6 +161,7 @@ def vp(text_field, label_field, foldid, bound_field=None, path=None, filename=No
                                                           alt_p=alt_p, 
                                                           foldid=foldid, 
                                                           num_experts=num_experts)
+    if not no_test_split: test_batch_size = len(test_data)
     alt_list = None
     alt_dict = None
 
@@ -246,13 +247,6 @@ def check_vocab(field):
         if word not in itos:
             print(word)
 
-
-
-no_test_split = False
-if args.xfolds == 0:
-    no_test_split = True
-    args.xfolds = 1
-
 print("Beginning {0}-fold cross-validation...".format(args.xfolds))
 print("Logging the results in {}".format(args.log_file))
 log_file_handle = open(args.log_file, 'w')
@@ -272,7 +266,7 @@ word_file = args.word_train_file
 phn_file = args.char_train_file
 word_test_file = args.word_test_file
 phn_test_file = args.char_test_file
-dialogues = read_in_dial_turn_idxs('data/wilkins_corrected.shuffled.51.indices')
+dialogues = read_in_dial_turn_idxs(os.path.join(args.data_dir, args.idx_file))
 full_dials = read_in_dialogues('data/vp16-CS_remapped.full.csv')
 #enh_dial_idxs = read_in_dial_turn_idxs('data/vp17-all.shuffled.69.indices') 
 #full_enh_dials = read_in_dialogues('data/vp17-all.full.csv') 
@@ -569,24 +563,24 @@ for xfold in range(args.xfolds):
         ensemble_dev_fold_accuracies.append(acc)
         print("Completed fold {0}. Accuracy on Dev: {1} for LOGIT".format(xfold, acc), file=log_file_handle)
         if args.eval_on_test:
+    #        if test_file is not None:
+    #            result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
+    #                                               log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
+    #                                               labels=labels, inv_labels=inv_labels, full_dials=full_enh_dials, dialogues=enh_dial_idxs, indices=indices, fold_id=xfold,
+    #                                               test_batch_size=test_batch_size)
+    #        else:
             result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args, two_ch=args.two_ch,
                                                log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
-                                               labels=labels, chats=chats, dialogues=dialogues, indices=indices, fold_id=xfold)
-            ensemble_test_fold_accuracies.append(result)
+                                               labels=labels, inv_labels=inv_labels, full_dials=full_dials, dialogues=dialogues, indices=indices, fold_id=xfold,
+                                               test_batch_size=test_batch_size)
+    #    if args.eval_on_test:
+    #        result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args, two_ch=args.two_ch,
+    #                                           log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
+    #                                           labels=labels, chats=chats, dialogues=dialogues, indices=indices, fold_id=xfold)
+    #        ensemble_test_fold_accuracies.append(result)
 
             print("Completed fold {0}. Accuracy on Test: {1} for LOGIT".format(xfold, result))
             print("Completed fold {0}. Accuracy on Test: {1} for LOGIT".format(xfold, result), file=log_file_handle)
-#    if args.eval_on_test:
-#        if test_file is not None:
-#            result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
-#                                               log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
-#                                               labels=labels, inv_labels=inv_labels, full_dials=full_enh_dials, dialogues=enh_dial_idxs, indices=indices, fold_id=xfold,
-#                                               test_batch_size=test_batch_size)
-#        else:
-#            result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args,
-#                                               log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
-#                                               labels=labels, inv_labels=inv_labels, full_dials=full_dials, dialogues=dialogues, indices=indices, fold_id=xfold,
-#                                               test_batch_size=test_batch_size)
 
         log_file_handle.flush()
 
