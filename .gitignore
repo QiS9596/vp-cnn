@@ -3,11 +3,24 @@
 build
 dist
 *.egg-info
+__pycache__
 vpcnn/__pycache__
+
+#binaries
+model
+snapshot
 
 #emacs junk
 *~
 
-vpcnn/data/*trec*
-vpcnn/data/*shuffled*
-vpcnn/data/corrected-added.tsv
+# results
+**/*result.txt
+**/predictions*.txt
+
+vpcnn/data
+# vpcnn/data/*trec*
+# vpcnn/data/*shuffled*
+# vpcnn/data/corrected-added.tsv
+
+#ancillary data
+w2v
