@@ -2,11 +2,10 @@ import math
 import torch
 import scipy.stats as stats
 import ast
-def calc_indices(args):
+def calc_fold_indices(xfolds, len_dataset):
     #calc fold indices
     indices = []
-    numfolds = args.xfolds
-    len_dataset = 4330
+    numfolds = xfolds
     fold_size = math.ceil(len_dataset/numfolds)
     for fold in range(numfolds):
         startidx = fold*fold_size

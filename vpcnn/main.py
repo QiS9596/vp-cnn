@@ -40,7 +40,9 @@ parser.add_argument('-save-interval', type=int, default=5000, help='how many ste
 parser.add_argument('-save-dir', type=str, default='snapshot', help='where to save the snapshot')
 # data 
 parser.add_argument('-data-dir', type=str, default='./data/', help='directory containing data files')
-parser.add_argument('-idx-file', type=str, default='wilkins.shuffled.30.indices', help='file containing dial,turn idxs corresponding to train-file entries, in order, in `data-dir`')
+parser.add_argument('-train-idx-file', type=str, default='wilkins.shuffled.30.indices', help='file containing dial,turn idxs corresponding to train-file entries, in order, in `data-dir`')
+parser.add_argument('-test-idx-file', type=str, default='wilkins.shuffled.30.indices', help='file containing dial,turn idxs corresponding to test-file entries, if using fixed test set (xfolds=0), in order, in `data-dir`')
+parser.add_argument('-full-test-dialogues', type=str, default='vp16-CS_remapped.fix.full.csv', help='file containing dial,turn idxs corresponding to test-file entries, if using fixed test set (xfolds=0), in order, in `data-dir`')
 parser.add_argument('-two-ch', action='store_true', help='use two-channel boundary/phone model, when supplying appropriate data')
 parser.add_argument('-char-train-file', type=str, default='wilkins.phone.shuffled.30.txt', help='file containing char data for training, in `data-dir`')
 parser.add_argument('-word-train-file', type=str, default='wilkins.word.shuffled.30.txt', help='file containing word data for training, in `data-dir`')
@@ -224,6 +226,7 @@ def vp_enh(text_field, label_field, **kargs):
     return enh_iter
 
 
+# TODO: parameterize this:
 def char_tokenizer(mstring):
 #    return mstring.split()
     return list(mstring)
@@ -259,15 +262,28 @@ ensemble_test_fold_accuracies = []
 orig_save_dir = args.save_dir
 update_args = True
 
-indices = calc_indices(args)
 data_dir = args.data_dir
 labels, inv_labels = read_in_labels('data/labels.txt')
 word_file = args.word_train_file
 phn_file = args.char_train_file
 word_test_file = args.word_test_file
 phn_test_file = args.char_test_file
-dialogues = read_in_dial_turn_idxs(os.path.join(args.data_dir, args.idx_file))
-full_dials = read_in_dialogues('data/vp16-CS_remapped.full.csv')
+
+# these get used for indexing alternatives if using sampling
+train_dialogues = read_in_dial_turn_idxs(os.path.join(args.data_dir, args.train_idx_file))
+# these get used for printing test features to pass to chooser
+
+if no_test_split:
+    test_dialogues = read_in_dial_turn_idxs(os.path.join(args.data_dir, args.test_idx_file))
+else:
+    test_dialogues = train_dialogues
+
+len_all_test_data = len(test_dialogues)
+
+# to index examples for printing features to pass to chooser for test predictions:
+fold_indices = calc_fold_indices(args.xfolds, len_all_test_data) 
+full_dials = read_in_dialogues(os.path.join(args.data_dir, args.full_test_dialogues))
+
 #enh_dial_idxs = read_in_dial_turn_idxs('data/vp17-all.shuffled.69.indices') 
 #full_enh_dials = read_in_dialogues('data/vp17-all.full.csv') 
 #chats = read_in_chat('data/stats.16mar2017.csv', dialogues)
@@ -307,7 +323,7 @@ for xfold in range(args.xfolds):
                                              filename=phn_file,
                                              test_filename=phn_test_file,
                                              label_filename=phn_labels,
-                                             train_idxs=dialogues,
+                                             train_idxs=train_dialogues,
                                              alt_file=args.char_alt_file,
                                              alt_p=args.alt_prob,
                                              foldid=None if no_test_split else xfold, 
@@ -327,7 +343,7 @@ for xfold in range(args.xfolds):
                                                             filename=word_file,
                                                             test_filename=word_test_file,
                                                             label_filename=word_labels,
-                                                            train_idxs=dialogues,
+                                                            train_idxs=train_dialogues,
                                                             alt_file=args.word_alt_file,
                                                             alt_p=args.alt_prob,
                                                             foldid=None if no_test_split else xfold,
@@ -526,7 +542,7 @@ for xfold in range(args.xfolds):
                                              filename=phn_file, 
                                              test_filename=phn_test_file,
                                              label_filename=phn_labels,
-                                             train_idxs=dialogues, 
+                                             train_idxs=train_dialogues, 
                                              alt_file=args.char_alt_file, 
                                              alt_p=args.alt_prob,
                                              foldid=None if no_test_split else xfold, 
@@ -545,7 +561,7 @@ for xfold in range(args.xfolds):
                                                             filename=word_file, 
                                                             test_filename=word_test_file,
                                                             label_filename=word_labels,
-                                                            train_idxs=dialogues, 
+                                                            train_idxs=train_dialogues, 
                                                             alt_file=args.word_alt_file, 
                                                             alt_p=args.alt_prob,
                                                             foldid=None if no_test_split else xfold,
@@ -571,7 +587,7 @@ for xfold in range(args.xfolds):
     #        else:
             result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args, two_ch=args.two_ch,
                                                log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
-                                               labels=labels, inv_labels=inv_labels, full_dials=full_dials, dialogues=dialogues, indices=indices, fold_id=xfold,
+                                               labels=labels, inv_labels=inv_labels, full_dials=full_dials, dialogues=test_dialogues, indices=fold_indices, fold_id=xfold,
                                                test_batch_size=test_batch_size)
     #    if args.eval_on_test:
     #        result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args, two_ch=args.two_ch,

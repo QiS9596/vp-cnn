@@ -24,6 +24,7 @@ def shuffle_data(dataset_list, dialogues, shuffled_data_file, indices_file, data
 def main(data_file, dialogue_file, shuffled_data_file, indices_file, dataset2 = None, shuffled2 = None):
     dialogues = calc_dial_turn_idxs(dialogue_file)
     data_list = open(data_file).readlines()
+    data2_list = None
     if dataset2 is not None:
         data2_list = open(dataset2).readlines()
     shuffle_data(data_list, dialogues, shuffled_data_file, indices_file, data2_list, shuffled2)
