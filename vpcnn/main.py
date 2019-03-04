@@ -593,7 +593,7 @@ for xfold in range(args.xfolds):
     #        result = train.eval_final_ensemble(test_iter, test_iter_word, char_cnn, word_cnn, final_logit, args, two_ch=args.two_ch,
     #                                           log_file_handle=log_file_handle, prediction_file_handle=prediction_file_handle,
     #                                           labels=labels, chats=chats, dialogues=dialogues, indices=indices, fold_id=xfold)
-    #        ensemble_test_fold_accuracies.append(result)
+            ensemble_test_fold_accuracies.append(result)
 
             print("Completed fold {0}. Accuracy on Test: {1} for LOGIT".format(xfold, result))
             print("Completed fold {0}. Accuracy on Test: {1} for LOGIT".format(xfold, result), file=log_file_handle)
