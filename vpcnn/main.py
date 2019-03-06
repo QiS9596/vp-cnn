@@ -144,12 +144,17 @@ def mr(text_field, label_field, **kargs):
         **kargs)
     return train_iter, dev_iter
 
-test_batch_size = args.batch_size
+if no_test_split:
+    test_batch_size = args.batch_size
+else:
+    test_batch_size = len(test_data)
 
 # load VP dataset
 
-def vp(text_field, label_field, foldid, bound_field=None, path=None, filename=None, 
-       test_filename=None, label_filename=None, train_idxs=None, alt_file=None, alt_p=0.0, num_experts=0, **kargs):
+def vp(text_field, label_field, foldid, test_batch_size, bound_field=None,
+       path=None, filename=None, 
+       test_filename=None, label_filename=None, train_idxs=None,
+       alt_file=None, alt_p=0.0, num_experts=0, **kargs):
     # print('num_experts', num_experts)
     train_data, dev_data, test_data = vpdataset.VP.splits(text_field, 
                                                           label_field, 
@@ -163,7 +168,6 @@ def vp(text_field, label_field, foldid, bound_field=None, path=None, filename=No
                                                           alt_p=alt_p, 
                                                           foldid=foldid, 
                                                           num_experts=num_experts)
-    if not no_test_split: test_batch_size = len(test_data)
     alt_list = None
     alt_dict = None
 
@@ -322,6 +326,7 @@ for xfold in range(args.xfolds):
                                              path=data_dir, 
                                              filename=phn_file,
                                              test_filename=phn_test_file,
+                                             test_batch_size=test_batch_size,
                                              label_filename=phn_labels,
                                              train_idxs=train_dialogues,
                                              alt_file=args.char_alt_file,
@@ -342,6 +347,7 @@ for xfold in range(args.xfolds):
                                                             path=data_dir, 
                                                             filename=word_file,
                                                             test_filename=word_test_file,
+                                                            test_batch_size=test_batch_size,
                                                             label_filename=word_labels,
                                                             train_idxs=train_dialogues,
                                                             alt_file=args.word_alt_file,
@@ -541,6 +547,7 @@ for xfold in range(args.xfolds):
                                              path=data_dir, 
                                              filename=phn_file, 
                                              test_filename=phn_test_file,
+                                             test_batch_size=test_batch_size,
                                              label_filename=phn_labels,
                                              train_idxs=train_dialogues, 
                                              alt_file=args.char_alt_file, 
@@ -560,6 +567,7 @@ for xfold in range(args.xfolds):
                                                             path=data_dir, 
                                                             filename=word_file, 
                                                             test_filename=word_test_file,
+                                                            test_batch_size=test_batch_size,
                                                             label_filename=word_labels,
                                                             train_idxs=train_dialogues, 
                                                             alt_file=args.word_alt_file, 
