@@ -127,6 +127,7 @@ def ensemble_eval(data_iter, models, args, two_ch=False, **kwargs):
             #print(total_logit.size())
 
         choices = torch.max(total_logit, 1)[1].view(target.size())
+        #print(choices, file=kwargs['log_file_handle'])
         ens_correct += choices.eq(target.data.cpu()).sum()
 
     # logits.append(logit)
@@ -163,7 +164,7 @@ def ensemble_eval(data_iter, models, args, two_ch=False, **kwargs):
     print('\nEvaluation ensemble {} - acc: {:.4f}%({}/{})'.format(args.ensemble.upper(), ens_accuracy, ens_correct, size))
     if args.verbose:
         print('Evaluation ensemble {} - acc: {:.4f}%({}/{})'.format(args.ensemble.upper(), ens_accuracy, ens_correct, size), file=kwargs['log_file_handle'])
-    return accuracy
+    return ens_accuracy
 
 def train(train_iter, dev_iter, model, args, two_ch=False, **kwargs):
     if args.cuda:

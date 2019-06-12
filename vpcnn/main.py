@@ -147,7 +147,7 @@ def mr(text_field, label_field, **kargs):
 if no_test_split:
     test_batch_size = args.batch_size
 else:
-    test_batch_size = len(test_data)
+    test_batch_size = args.batch_size
 
 # load VP dataset
 
@@ -221,13 +221,13 @@ def vp(text_field, label_field, foldid, test_batch_size, bound_field=None,
             **kargs)
     return train_iter, dev_iter, test_iter
 
-def vp_enh(text_field, label_field, **kargs):
+#def vp_enh(text_field, label_field, **kargs):
     # print('num_experts', num_experts)
-    enh_data = vpdataset.VP(text_field, label_field, path='data', filename='vp17-all.shuffled.69.lbl_in.txt')
+#    enh_data = vpdataset.VP(text_field, label_field, path='data', filename='vp17-all.shuffled.69.lbl_in.txt')
     # this is just being treated as a test set for now, so it doesn't matter how many
     # experts there are, and we want to use the existing vocabularies from training for evaluation
-    enh_iter = data.Iterator(enh_data, args.batch_size, train=False)
-    return enh_iter
+#    enh_iter = data.Iterator(enh_data, args.batch_size, train=False)
+#    return enh_iter
 
 
 # TODO: parameterize this:
