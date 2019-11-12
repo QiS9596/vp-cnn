@@ -267,21 +267,24 @@ orig_save_dir = args.save_dir
 update_args = True
 
 data_dir = args.data_dir
+# labels are text examples of each labels with spaces replaced by underscores
+# inv_labels are the corresponding index of the label
 labels, inv_labels = read_in_labels('data/labels.txt')
 word_file = args.word_train_file
 phn_file = args.char_train_file
 word_test_file = args.word_test_file
-phn_test_file = args.char_test_file
+phn_test_file = args.char_test_file # here we use the same file as word level embedding
 
 # these get used for indexing alternatives if using sampling
 train_dialogues = read_in_dial_turn_idxs(os.path.join(args.data_dir, args.train_idx_file))
 # these get used for printing test features to pass to chooser
+# train_dialogues is a list of indices pairs
 
 if no_test_split:
     test_dialogues = read_in_dial_turn_idxs(os.path.join(args.data_dir, args.test_idx_file))
 else:
     test_dialogues = train_dialogues
-
+# if using cross validation (default case is 10-fold validation), they we area using
 len_all_test_data = len(test_dialogues)
 
 # to index examples for printing features to pass to chooser for test predictions:
@@ -307,6 +310,7 @@ for xfold in range(args.xfolds):
     print("\nLoading data...")
 
     tokenizer = data.Pipeline(vpdataset.clean_str)
+    # cleaning wired characters, replace puncuations in wired format with the standard one
 
     text_field = data.Field(lower=True, tokenize=char_tokenizer)
     word_field = data.Field(lower=True, tokenize=tokenizer)

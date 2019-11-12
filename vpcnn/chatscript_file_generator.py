@@ -3,6 +3,12 @@ import torch
 import scipy.stats as stats
 import ast
 def calc_fold_indices(xfolds, len_dataset):
+    """
+    calculate fold indices
+    :param xfolds: number of fold
+    :param len_dataset: length of the turns
+    :return: list of tuple; each tuple contains (startidx, endidx) as start and end of a flod
+    """
     #calc fold indices
     indices = []
     numfolds = xfolds
@@ -14,6 +20,12 @@ def calc_fold_indices(xfolds, len_dataset):
     return indices
 
 def read_in_labels(labels_file):
+    """
+    read the label.txt file from the given path
+    spaces in the text will be replaced by underscore
+    :param labels_file: path to label file
+    :return: transformed text, int label
+    """
     labels = []
     inv_labels = {}
     with open(labels_file) as l:
@@ -24,6 +36,13 @@ def read_in_labels(labels_file):
     return labels, inv_labels
 
 def read_in_dialogues(dialogue_file):
+    """
+    load dialogues
+    each item in the full_dials dictionary is a turn
+    each turn has corresponding dialog and turn index
+    :param dialogue_file: path to dialogue file
+    :return:dictionary
+    """
     full_dials = {}
     dialogue_index = -1
     turn_index = -1
@@ -39,6 +58,11 @@ def read_in_dialogues(dialogue_file):
     return full_dials
 
 def read_in_dial_turn_idxs(dialogue_file):
+    """
+    load the target indices file
+    :param dialogue_file: path to target file, should be string end with indices
+    :return: list of tuples
+    """
     dialogue_indices = []
     dialogue_index = -1
     turn_index = -1
