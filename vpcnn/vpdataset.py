@@ -125,7 +125,7 @@ class VP(data.Dataset):
         # if alt_file is not None, an alternative will be chosen at a frequency
         # specified by alt_p, with identity of the alternative determined by the 
         # count value provided in `alts`.
-
+        # Qi: looks like train_idxs is also not used, plus alt_file and alt_p
         alt_dict = None
         prob_dict = None
         #denom_dict = {}
@@ -180,6 +180,7 @@ class VP(data.Dataset):
             traindev_idxs = [(999,999) for ex in examples]
         else:
             traindev_idxs = []
+        # for the current test we will always assign foldid
         if foldid==None:
             if num_experts > 0:
                 assert num_experts <= 5
@@ -221,6 +222,8 @@ class VP(data.Dataset):
         else:
             # assuming we don't want to use cross-validation if we have a fixed pre-defined test set
             # (if we change our minds, this needs some updating)
+
+            # for the current version we will always assign foldid
 
             #get all folds
             fold_size = math.ceil(len(examples)/numfolds)
