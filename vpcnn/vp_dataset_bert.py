@@ -29,11 +29,11 @@ class VPDataset_bert_embedding(Dataset):
         """
         This method splits the dataset into two parts: the training data and the testing data. We would not use
         development set to monitor the performance on unseen data during the training.
-        If num_experts = 0 returns a tuple, the first element of the tuple would be the development dataset object,
-        the second would be the training object, the third one would be the test object
+        If num_experts = 0 returns a tuple, the first element of the tuple would be the training dataset object,
+        the second would be the development object, the third one would be the test object
         If num_experts > 0, returns a tuple; the first element of the tuple is a list object contains the dataset
-        objects for development, the second element of the tuple is also a list object, contains the dataset objects for
-        training, both of the list has the same length as num_experts; the third element is also a list object,
+        objects for training, the second element of the tuple is also a list object, contains the dataset objects for
+        development, both of the list has the same length as num_experts; the third element is also a list object,
         containing the dataset object for test data obtained via cross validation
         To make each of the CNN classifier in the ensemble slightly different, we will assign slightly different training
         and development set to them.
@@ -57,17 +57,37 @@ class VPDataset_bert_embedding(Dataset):
         df_label = pd.read_csv(label_path, sep='\t', header=None, names=['labels', 'embed'])
         # We split the data into k splits
         fold_dfs = np.array_split(ary=df,indices_or_sections=num_fold)
+        # claim test fold
+        test_ = cls(df=fold_dfs[foldid])
+        # then concat the rest fold as train-dev data
+        train_dev_folds = fold_dfs[:foldid] + fold_dfs[foldid + 1:]
+        df_train_dev = pd.concat(train_dev_folds)
+        dev_length = np.floor(dev_split * float(len(df_train_dev)))
         # if the num_experts == 0, then it indicates only one CNN model is trained
         if num_experts == 0:
-            test_ = cls(df=fold_dfs[foldid])
-            train_dev_folds = fold_dfs[:foldid]+fold_dfs[foldid+1:]
-            df_train_dev = pd.concat(train_dev_folds)
-            # we substract first several element correspond to the dev_split parameter and set them as development set
-            dev_length = np.floor(dev_split*float(len(df_train_dev)))
-            dev_df = df_train_dev[:dev_length]
+
+            # we substract last several element correspond to the dev_split parameter and set them as development set
+
+            dev_df = df_train_dev[-1*dev_length:]
             # the other training examples plus the label set are served as training set
-            train_df = pd.concat([df_train_dev[:dev_length], df_label])
-            return (cls(df=dev_df),
+            train_df = pd.concat([df_train_dev[:-1*dev_length], df_label])
+            return (
                     cls(df=train_df),
+                    cls(df=dev_df),
                     test_)
+        else:
+            # assert that each stack of CNN contains at most 5 agents
+            assert num_experts <= 5
+            devs = []
+            trains = []
+
+            # then for each expert, it will gets a dev set and a training set, the length of dev sets are all dev_length
+            # but the dev set and training set for each expert are different to make sure they are divergent
+            for i in range(num_experts):
+                devs.append(cls(df=df_train_dev[dev_length*i:dev_length*(i+1)]))
+                train_current = pd.concat([df_train_dev[:dev_length*i],
+                                           df_train_dev[dev_length*(i+1):],
+                                           df_label])
+                trains.append(cls(df=train_current))
+            return (trains, devs, test_)
 
