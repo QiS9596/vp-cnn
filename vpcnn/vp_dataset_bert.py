@@ -68,9 +68,9 @@ class VPDataset_bert_embedding(Dataset):
 
             # we substract last several element correspond to the dev_split parameter and set them as development set
 
-            dev_df = df_train_dev[-1*dev_length:]
+            dev_df = df_train_dev[int(-1*dev_length):]
             # the other training examples plus the label set are served as training set
-            train_df = pd.concat([df_train_dev[:-1*dev_length], df_label])
+            train_df = pd.concat([df_train_dev[:int(-1*dev_length)], df_label])
             return (
                     cls(df=train_df),
                     cls(df=dev_df),
@@ -84,9 +84,9 @@ class VPDataset_bert_embedding(Dataset):
             # then for each expert, it will gets a dev set and a training set, the length of dev sets are all dev_length
             # but the dev set and training set for each expert are different to make sure they are divergent
             for i in range(num_experts):
-                devs.append(cls(df=df_train_dev[dev_length*i:dev_length*(i+1)]))
-                train_current = pd.concat([df_train_dev[:dev_length*i],
-                                           df_train_dev[dev_length*(i+1):],
+                devs.append(cls(df=df_train_dev[int(dev_length*i):int(dev_length*(i+1))]))
+                train_current = pd.concat([df_train_dev[:int(dev_length*i)],
+                                           df_train_dev[int(dev_length*(i+1)):],
                                            df_label])
                 trains.append(cls(df=train_current))
             return (trains, devs, test_)
