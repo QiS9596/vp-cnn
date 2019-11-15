@@ -23,7 +23,7 @@ def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device
         for name, tensor in data_dict.items():
             out_data_dict[name] = data_dict[name]
             if device == 'cuda':
-                out_data_dict[name] = out_data_dict[name].cuda()
+                out_data_dict[name] = data_dict[name].cuda()
         yield out_data_dict
 
 def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, epochs=25, batch_size=50,
