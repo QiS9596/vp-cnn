@@ -22,8 +22,8 @@ def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device
         out_data_dict = {}
         for name, tensor in data_dict.items():
             out_data_dict[name] = data_dict[name]
-            if device == 'cuda':
-                out_data_dict[name] = data_dict[name].to('cuda')
+            # if device == 'cuda':
+                # out_data_dict[name] = data_dict[name].to('cuda')
         yield out_data_dict
 
 def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, epochs=25, batch_size=50,
@@ -64,7 +64,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
         # fit model on batch
         for batch in train_batchs:
             feature = batch['embed']
-            target = batch['labels']
+            target = batch['label']
             # step 1: set optimizer to zero grad
             optimizer.zero_grad()
             # step 2: make prediction
