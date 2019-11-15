@@ -19,8 +19,23 @@ class CNN_Text(nn.Module):
                  two_ch=False,
                  static=False,
                  vectors=None):
+        """
+        Qi:
+        :param class_num: number of class (for the purpose of linear softmax layer)
+        :param kernel_num: number of kernel(result in depth of the convolutional layer)
+        :param kernel_sizes: sizes of several kernels, for length dimension, the width dimension is same as embed_dim
+        :param embed_num:
+        :param embed2_num:
+        :param embed_dim: dimensionality of each word's embedding, also used as kerlnel width
+        :param dropout:
+        :param conv_init:
+        :param fc_init:
+        :param two_ch:
+        :param static:
+        :param vectors: pretrained embedding matrix
+        """
         super(CNN_Text,self).__init__()
-        
+        # what is this static?
         self.static = static
         self.two_ch = two_ch
         
