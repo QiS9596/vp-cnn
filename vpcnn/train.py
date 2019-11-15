@@ -242,7 +242,7 @@ def train(train_iter, dev_iter, model, args, two_ch=False, **kwargs):
         acc = eval(dev_iter, model, args, two_ch=two_ch, **kwargs)
         if acc > best_acc:
             best_acc = acc
-            best_model = copy.deepcopy(model)
+            best_model = copy.deepcopy(model) # Qi: kind of confused here
         # print(model.embed.weight[100])
     model = best_model
     acc = eval(dev_iter, model, args, two_ch=two_ch, **kwargs)
