@@ -21,7 +21,14 @@ def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device
     for data_dict in dataloader:
         out_data_dict = {}
         for name, tensor in data_dict.items():
-            out_data_dict[name] = data_dict[name]
+            if name=='embed':
+                print("type of a batch")
+                print(type(data_dict[name]))
+                print("type of an dataobject")
+                print(type(data_dict[name][0]))
+                out_data_dict[name] = torch.FloatTensor(data_dict[name])
+            else:
+                out_data_dict[name] = data_dict[name]
             # if device == 'cuda':
                 # out_data_dict[name] = data_dict[name].to('cuda')
         yield out_data_dict
