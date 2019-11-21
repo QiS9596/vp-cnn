@@ -60,7 +60,8 @@ class CNN_Embed(nn.Module):
 
     def forward(self, x):
         x = self.confidence(x)
-        logit = F.log_softmax(x)
+        # logit = F.log_softmax(x)
+        logit = F.softmax(x)
         return logit
 
     def confidence(self, x):
