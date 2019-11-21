@@ -112,14 +112,15 @@ class VPDataset_bert_embedding(Dataset):
         label_npy_path = os.path.join(root, label_npy_name)
         df = pd.read_csv(data_path, sep='\t',header=None, names=['labels', 'embed'])
         df_label = pd.read_csv(label_path, sep='\t', header=None, names=['labels', 'embed'])
-        df = VPDataset_bert_embedding.sequence_padding(df,max_seq_len=max_seq_len)
-        df_label = VPDataset_bert_embedding.sequence_padding(df_label,max_seq_len=max_seq_len)
+
         npy_data = np.load(data_npy_path, allow_pickle=True)
         npy_label = np.load(label_npy_path, allow_pickle=True)
         df = df['labels'].to_frame()
         df['embed'] = npy_data
         df_label = df_label['labels'].to_frame()
         df_label['embed'] = npy_label
+        df = VPDataset_bert_embedding.sequence_padding(df,max_seq_len=max_seq_len)
+        df_label = VPDataset_bert_embedding.sequence_padding(df_label,max_seq_len=max_seq_len)
         # We split the data into k splits
         fold_dfs = np.array_split(ary=df,indices_or_sections=num_fold)
         # claim test fold
