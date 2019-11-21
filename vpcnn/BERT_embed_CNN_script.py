@@ -15,3 +15,4 @@ train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=bert
                                                                    num_experts=0)
 model_cnn = model_bert.CNN_Embed()
 bert_train.train(train=train, dev=None,model=model_cnn)
+print("train seems complete")

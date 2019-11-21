@@ -76,6 +76,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             optimizer.zero_grad()
             # step 2: make prediction
             logit = model(feature)
+            target = autograd.Variable(target).cuda()
             # step 3: compute loss, here negative log likelihood is employed
             loss = F.nll_loss(input=logit, target=target)
             # step 4: use loss to produce gradient
