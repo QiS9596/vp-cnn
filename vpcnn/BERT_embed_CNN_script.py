@@ -14,4 +14,4 @@ train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=bert
                                                                    label_npy_name=bert_label_npy,
                                                                    num_experts=0)
 model_cnn = model_bert.CNN_Embed()
-bert_train.train(train=train, dev=None,model=model_cnn,batch_size=1)
+bert_train.train(train=train, dev=None,model=model_cnn)
