@@ -65,6 +65,7 @@ class CNN_Embed(nn.Module):
 
     def confidence(self, x):
         # x = x.unsqueeze(1)
+        x = autograd.Variable(x.data)
         x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]
         x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x]
         x = torch.cat(x,1)
