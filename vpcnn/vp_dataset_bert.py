@@ -73,7 +73,7 @@ class VPDataset_bert_embedding(Dataset):
 
     @classmethod
     def splits(cls, num_fold=10, foldid=0, root='.', filename=None, label_filename=None,train_npy_name=None,
-               label_npy_name=None, num_experts=5,dev_split=0.1):
+               label_npy_name=None, num_experts=5,dev_split=0.1, max_seq_len=32):
         """
         This method splits the dataset into two parts: the training data and the testing data. We would not use
         development set to monitor the performance on unseen data during the training.
@@ -112,6 +112,8 @@ class VPDataset_bert_embedding(Dataset):
         label_npy_path = os.path.join(root, label_npy_name)
         df = pd.read_csv(data_path, sep='\t',header=None, names=['labels', 'embed'])
         df_label = pd.read_csv(label_path, sep='\t', header=None, names=['labels', 'embed'])
+        df = VPDataset_bert_embedding.sequence_padding(df,max_seq_len=max_seq_len)
+        df_label = VPDataset_bert_embedding.sequence_padding(df_label,max_seq_len=max_seq_len)
         npy_data = np.load(data_npy_path, allow_pickle=True)
         npy_label = np.load(label_npy_path, allow_pickle=True)
         df = df['labels'].to_frame()

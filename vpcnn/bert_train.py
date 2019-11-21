@@ -21,7 +21,7 @@ def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device
     for data_dict in dataloader:
         out_data_dict = {}
         for name, tensor in data_dict.items():
-            if name=='embed':
+            if name=='embed__':
                 print("type of a batch")
                 print(type(data_dict[name]))
                 print("type of an dataobject")
