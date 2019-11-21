@@ -69,13 +69,16 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
     # begin training
     for epoch in range(1, epochs+1):
         # fit model on batch
+        print('-------------------------------------------')
         for batch in train_batchs:
             feature = batch['embed']
             target = batch['label']
+            print(target)
             # step 1: set optimizer to zero grad
             optimizer.zero_grad()
             # step 2: make prediction
             logit = model(feature)
+            print(logit)
             target = autograd.Variable(target).cuda()
             # step 3: compute loss, here negative log likelihood is employed
             loss = F.nll_loss(input=logit, target=target)
@@ -92,6 +95,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
                         row.div_(norm).mul_(max_norm)
                 else:
                     model.fc1.weight.data.renorm_(2,0,max_norm)
+        print(loss)
     print(loss)
     # TODO eval
 #TODO predict,eval and ensemble train functions
