@@ -99,7 +99,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
                 else:
                     model.fc1.weight.data.renorm_(2,0,max_norm)
         eval(dev, model, batch_size, use_cuda)
-    
+
     # TODO eval
 #TODO predict,eval and ensemble train functions
 def eval(data_iter, model, batch_size, use_cuda=True):
@@ -116,7 +116,7 @@ def eval(data_iter, model, batch_size, use_cuda=True):
         target = batch['label']
         target = autograd.Variable(target).cuda()
         logit = model(feature)
-        loss = F.softmax(input=logit, target=target)
+        loss = F.cross_entropy(input=logit, target=target)
         avg_loss += loss.data[0]
         corrects += (torch.max(logit, 1)
                      [1].view(target.size()).data == target.data).sum()
