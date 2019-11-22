@@ -4,6 +4,7 @@ import torch
 import torch.autograd as autograd
 import torch.nn.functional as F
 import copy
+import numpy as np
 from torch.utils.data import DataLoader
 def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device='cuda'):
     """
@@ -78,7 +79,8 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             optimizer.zero_grad()
             # step 2: make prediction
             logit = model(feature)
-            print(logit)
+            logit_ = logit.data.cpu().numpy()
+            print(np.argmax(logit_, axis=1))
             target = autograd.Variable(target).cuda()
             # step 3: compute loss, here negative log likelihood is employed
             # loss = F.nll_loss(input=logit, target=target)
