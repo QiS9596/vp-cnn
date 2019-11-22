@@ -66,12 +66,15 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
     best_acc = 0
     best_model = None
     # train_batchs is a sqeuence of python dicts obtained based on the given dataset
-    train_batchs = generate_batches(dataset=train, batch_size=batch_size, shuffle=False, drop_last=False,device=device)
+    train_batchs_ = generate_batches(dataset=train, batch_size=batch_size, shuffle=False, drop_last=False,device=device)
+    train_batchs = []
+    for batch in train_batchs_:
+        train_batchs.append(copy.deepcopy(batch))
     # begin training
     for epoch in range(1, epochs+1):
         # fit model on batch
         batch_idx = 0
-        print('-------------------------------------------')
+        #print('-------------------------------------------')
         for batch in train_batchs:
             feature = batch['embed']
             target = batch['label']
@@ -91,11 +94,11 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             loss.backward()
             # step 5: update weights
             optimizer.step()
-            print(loss)
+            #print(loss)
             after_weight = model.convs1[0].weight.data.clone()
-            print(before_weight)
+            #print(before_weight)
             print('---')
-            print(after_weight)
+            #print(after_weight)
             #print('loss before '+ str(loss))
             #logit_ = model(feature)
             #loss_ = F.cross_entropy(input=logit_,target=target)
@@ -111,7 +114,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
                         row.div_(norm).mul_(max_norm)
                 else:
                     model.fc1.weight.data.renorm_(2,0,max_norm)
-        #print(loss)
+        print(loss)
     #print(loss)
     # TODO eval
 #TODO predict,eval and ensemble train functions
