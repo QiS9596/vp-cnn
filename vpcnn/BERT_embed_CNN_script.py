@@ -13,6 +13,6 @@ train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=bert
                                                                    train_npy_name=bert_data_npy,
                                                                    label_npy_name=bert_label_npy,
                                                                    num_experts=0)
-model_cnn = model_bert.CNN_Embed()
-bert_train.train(train=train, dev=None,optimizer='adadelta',model=model_cnn,lr=1e-6, l2=1e-2, epochs=1, max_norm=-1,batch_size=1)
+model_cnn = model_bert.CNN_Embed(kernel_num=15)
+bert_train.train(train=train, dev=None,optimizer='adadelta',model=model_cnn,lr=1e-6, l2=1e-2, epochs=500, max_norm=-1,batch_size=50)
 print("train seems complete")

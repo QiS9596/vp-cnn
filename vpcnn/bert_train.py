@@ -70,11 +70,12 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
     # begin training
     for epoch in range(1, epochs+1):
         # fit model on batch
+        batch_idx = 0
         print('-------------------------------------------')
         for batch in train_batchs:
             feature = batch['embed']
             target = batch['label']
-            print(target)
+            #print(target)
             # step 1: set optimizer to zero grad
             optimizer.zero_grad()
             # step 2: make prediction
@@ -82,6 +83,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             # logit_ = logit.data.cpu().numpy()
             # print(np.argmax(logit_, axis=1))
             target = autograd.Variable(target).cuda()
+            before_weight = model.convs1[0].weight.data.clone()
             # step 3: compute loss, here negative log likelihood is employed
             # loss = F.nll_loss(input=logit, target=target)
             loss = F.cross_entropy(input=logit, target=target)
@@ -89,10 +91,17 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             loss.backward()
             # step 5: update weights
             optimizer.step()
-            print('loss before '+ str(loss))
-            logit_ = model(feature)
-            loss_ = F.cross_entropy(input=logit_,target=target)
-            print(loss_)
+            print(loss)
+            after_weight = model.convs1[0].weight.data.clone()
+            print(before_weight)
+            print('---')
+            print(after_weight)
+            #print('loss before '+ str(loss))
+            #logit_ = model(feature)
+            #loss_ = F.cross_entropy(input=logit_,target=target)
+            #print('loss after'+str(loss_))
+            #if batch_idx >4: break
+            batch_idx += 1
             # max norm constraint
             # Qi: the code is directly copy paste from original one, dont completely sure the process
             if max_norm > 0:
@@ -102,7 +111,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
                         row.div_(norm).mul_(max_norm)
                 else:
                     model.fc1.weight.data.renorm_(2,0,max_norm)
-        print(loss)
-    print(loss)
+        #print(loss)
+    #print(loss)
     # TODO eval
 #TODO predict,eval and ensemble train functions

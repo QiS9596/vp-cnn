@@ -19,7 +19,7 @@ class VPDataset_bert_embedding(Dataset):
         if use_dummies:
             label_dum = pd.get_dummies(self.df['labels']).values
             dum_in_list = []
-            for i in range(label_dum[0]):
+            for i in range(label_dum.shape[0]):
                 dum_in_list.append(label_dum[i,:])
             self.df['labels'] = dum_in_list
 
