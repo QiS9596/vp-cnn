@@ -79,8 +79,8 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             optimizer.zero_grad()
             # step 2: make prediction
             logit = model(feature)
-            logit_ = logit.data.cpu().numpy()
-            print(np.argmax(logit_, axis=1))
+            # logit_ = logit.data.cpu().numpy()
+            # print(np.argmax(logit_, axis=1))
             target = autograd.Variable(target).cuda()
             # step 3: compute loss, here negative log likelihood is employed
             # loss = F.nll_loss(input=logit, target=target)
@@ -89,6 +89,10 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             loss.backward()
             # step 5: update weights
             optimizer.step()
+            print('loss before '+ str(loss))
+            logit_ = model(feature)
+            loss_ = F.cross_entropy(input=logit_,target=target)
+            print(loss_)
             # max norm constraint
             # Qi: the code is directly copy paste from original one, dont completely sure the process
             if max_norm > 0:

@@ -10,12 +10,18 @@ class VPDataset_bert_embedding(Dataset):
     the function is achieved via wrapping a Pandas.DataFrame object
     """
 
-    def __init__(self, df):
+    def __init__(self, df, use_dummies=False):
         """
         Initialization of dataset object
         :param df: Pandas.DataFrame object
         """
         self.df = df
+        if use_dummies:
+            label_dum = pd.get_dummies(self.df['labels']).values
+            dum_in_list = []
+            for i in range(label_dum[0]):
+                dum_in_list.append(label_dum[i,:])
+            self.df['labels'] = dum_in_list
 
     def __getitem__(self, index):
         return {'label':self.df.iloc[index]['labels'], 'embed':self.df.iloc[index]['embed']}
