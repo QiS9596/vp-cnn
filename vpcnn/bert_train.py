@@ -77,6 +77,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
         for batch in train_batchs:
             feature = batch['embed']
             target = batch['label']
+            before = copy.deepcopy(list(model.parameters())[0])
             # step 1: set optimizer to zero grad
             optimizer.zero_grad()
             # step 2: make prediction
@@ -88,6 +89,8 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             loss.backward()
             # step 5: update weights
             optimizer.step()
+            after = copy.deepcopy(list(model.parameters())[0])
+            print(torch.equal(before.data, after.data))
             batch_idx += 1
             # max norm constraint
             # Qi: the code is directly copy paste from original one, dont completely sure the process
@@ -128,3 +131,4 @@ def eval(data_iter, model, batch_size, use_cuda=True):
                                                                        corrects,
                                                                        len(data_iter)))
     return accuracy
+# def is_training(mdl1, mdl2):
