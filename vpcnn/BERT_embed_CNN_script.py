@@ -14,5 +14,5 @@ train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=bert
                                                                    label_npy_name=bert_label_npy,
                                                                    num_experts=0)
 model_cnn = model_bert.CNN_Embed(kernel_num=15)
-bert_train.train(train=train, dev=None,optimizer='adadelta',model=model_cnn,lr=1e-3, l2=1e-2, epochs=50, batch_size=50)
+bert_train.train(train=train, dev=None,optimizer='adadelta',model=model_cnn,lr=1e-3, epochs=50, batch_size=50)
 print("train seems complete")

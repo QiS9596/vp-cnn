@@ -74,36 +74,20 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
     for epoch in range(1, epochs+1):
         # fit model on batch
         batch_idx = 0
-        #print('-------------------------------------------')
         for batch in train_batchs:
             feature = batch['embed']
             target = batch['label']
-            #print(target)
             # step 1: set optimizer to zero grad
             optimizer.zero_grad()
             # step 2: make prediction
             logit = model(feature)
-            # logit_ = logit.data.cpu().numpy()
-            # print(np.argmax(logit_, axis=1))
             target = autograd.Variable(target).cuda()
-            before_weight = model.convs1[0].weight.data.clone()
             # step 3: compute loss, here negative log likelihood is employed
-            # loss = F.nll_loss(input=logit, target=target)
             loss = F.cross_entropy(input=logit, target=target)
             # step 4: use loss to produce gradient
             loss.backward()
             # step 5: update weights
             optimizer.step()
-            #print(loss)
-            after_weight = model.convs1[0].weight.data.clone()
-            #print(before_weight)
-            print('---')
-            #print(after_weight)
-            #print('loss before '+ str(loss))
-            #logit_ = model(feature)
-            #loss_ = F.cross_entropy(input=logit_,target=target)
-            #print('loss after'+str(loss_))
-            #if batch_idx >4: break
             batch_idx += 1
             # max norm constraint
             # Qi: the code is directly copy paste from original one, dont completely sure the process
@@ -114,7 +98,33 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
                         row.div_(norm).mul_(max_norm)
                 else:
                     model.fc1.weight.data.renorm_(2,0,max_norm)
-        print(loss)
-    #print(loss)
+        eval(dev, model, batch_size, use_cuda)
+    
     # TODO eval
 #TODO predict,eval and ensemble train functions
+def eval(data_iter, model, batch_size, use_cuda=True):
+    model.eval()
+    corrects, avg_loss = 0, 0
+    batchs_ = generate_batches(dataset=data_iter, batch_size=batch_size, shuffle=False, drop_last=False)
+    if use_cuda:
+        model.cuda()
+    # batchs = []
+    # for batch in batchs_:
+    #     batchs.append(copy.deepcopy(batch))
+    for batch in batchs_:
+        feature = batch['embed']
+        target = batch['label']
+        target = autograd.Variable(target).cuda()
+        logit = model(feature)
+        loss = F.softmax(input=logit, target=target)
+        avg_loss += loss.data[0]
+        corrects += (torch.max(logit, 1)
+                     [1].view(target.size()).data == target.data).sum()
+    avg_loss /= len(data_iter)
+    accuracy = corrects/len(data_iter)
+    model.train()
+    print('\nEvaluation - loss: {:.6f}  acc: {:.4f}%({}/{})'.format(avg_loss,
+                                                                       accuracy,
+                                                                       corrects,
+                                                                       len(data_iter)))
+    return accuracy
