@@ -90,7 +90,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             # step 5: update weights
             optimizer.step()
             after = copy.deepcopy(list(model.parameters())[0])
-            print(torch.equal(before.data, after.data))
+            #print(torch.equal(before.data, after.data))
             batch_idx += 1
             # max norm constraint
             # Qi: the code is directly copy paste from original one, dont completely sure the process
