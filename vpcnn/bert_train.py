@@ -1,3 +1,6 @@
+"""
+The model provides training and evaluation method similar to train.py but compatible with bert cnn models
+"""
 import os
 import sys
 import torch
@@ -10,12 +13,12 @@ def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device
     """
     generator function wraps pytorch dataloader
     generate a sequence of dictionary, each one contains data for each batch
-    :param dataset:
-    :param batch_size:
-    :param shuffle:
+    :param dataset: dataset object
+    :param batch_size: int; size of each mini batch
+    :param shuffle: bool; if to random shuffle the dataset
     :param drop_last:
     :param device:
-    :return:
+    :return: a generator which generates a sequence of batch dictionary
     """
     dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)
 
@@ -37,19 +40,19 @@ def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device
 def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, epochs=25, batch_size=50,
           max_norm=3.0, no_always_norm=False):
     """
-
-    :param train:
-    :param dev:
-    :param model:
-    :param optimizer:
-    :param use_cuda:
-    :param lr:
+    training single bert cnn model
+    :param train: training dataset object
+    :param dev: development dataset object
+    :param model: model object to be trained
+    :param optimizer: str; for choosing optimizer
+    :param use_cuda: bool; for using cuda or not
+    :param lr: float; learning rate
     :param l2: l2 regularization of optimizer
     :param epochs: int; max number of epochs
     :param batch_size: int; batch size
     :param max_norm: float, l2 constraint for parameters
     :param no_always_norm: boolean; if true then do some black magic to norm of output layer
-    :return:
+    :return: tuple of acc and copy of best model
     """
     device = 'cpu'
     if use_cuda:
@@ -101,11 +104,23 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
                         row.div_(norm).mul_(max_norm)
                 else:
                     model.fc1.weight.data.renorm_(2,0,max_norm)
-        eval(dev, model, batch_size, use_cuda)
+        acc = eval(dev, model, batch_size, use_cuda)
+        if acc > best_acc:
+            best_model = copy.deepcopy(model)
+    model = best_model
+    acc = eval(dev, model, batch_size, use_cuda)
+    return acc, model
 
-    # TODO eval
-#TODO predict,eval and ensemble train functions
+
 def eval(data_iter, model, batch_size, use_cuda=True):
+    """
+    evaluation method for single model
+    :param data_iter: dataset object for evaluation
+    :param model: model object to be evaluated
+    :param batch_size: size of mini batch
+    :param use_cuda: bool; if to use cuda
+    :return: accuracy measured on the given dataset
+    """
     model.eval()
     corrects, avg_loss = 0, 0
     batchs_ = generate_batches(dataset=data_iter, batch_size=batch_size, shuffle=False, drop_last=False)
@@ -124,11 +139,19 @@ def eval(data_iter, model, batch_size, use_cuda=True):
         corrects += (torch.max(logit, 1)
                      [1].view(target.size()).data == target.data).sum()
     avg_loss /= len(data_iter)
-    accuracy = corrects/len(data_iter)
+    accuracy = corrects/len(data_iter) * 100.0
     model.train()
     print('\nEvaluation - loss: {:.6f}  acc: {:.4f}%({}/{})'.format(avg_loss,
                                                                        accuracy,
                                                                        corrects,
                                                                        len(data_iter)))
     return accuracy
-# def is_training(mdl1, mdl2):
+
+def ensemble_predict(batch_feature, batch_target, models):
+    """
+    This function takes a stack of bert cnn models and evaluate the ensemble on the given batch
+    :param batch_feature: the features field, the word embedding per se
+    :param batch_target: the training target
+    :param models: a list of model, serves as an embedding
+    :return:
+    """

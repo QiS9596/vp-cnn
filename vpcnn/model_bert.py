@@ -1,3 +1,6 @@
+"""
+This module contains CNN network that directly eat bert embeddings, with similar function as model.py
+"""
 import torch
 import torch.nn as nn
 from torch.nn import init
