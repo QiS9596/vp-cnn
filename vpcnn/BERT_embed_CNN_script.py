@@ -16,8 +16,8 @@ for i in range(10):
                                                                    train_npy_name=bert_data_npy,
                                                                    label_npy_name=bert_label_npy,
                                                                    num_experts=0)
-    model_cnn = model_bert.CNN_Embed(kernel_num=400)
-    acc, model = bert_train.train(train=train, dev=dev,optimizer='adadelta',model=model_cnn,lr=1e-3, epochs=1000, batch_size=25)
+    model_cnn = model_bert.CNN_Embed(kernel_num=500)
+    acc, model = bert_train.train(train=train, dev=dev,optimizer='adadelta',model=model_cnn,lr=1e-2, epochs=500, batch_size=50)
     validation_acc = bert_train.eval(test, model, batch_size=50)
     validation_sum += validation_acc
 print("train seems complete")
