@@ -4,10 +4,10 @@ This is a script the run some bert embedding CNN test to make sure the module is
 import vp_dataset_bert
 import model_bert
 import bert_train
-bert_embedding_path = 'data/bert_embeddings/all_avg4.tsv'
-bert_label_embedding_path = 'data/bert_embeddings/labels_avg4.tsv'
-bert_data_npy = 'data/bert_embeddings/all.npy'
-bert_label_npy = 'data/bert_embeddings/labels.npy'
+bert_embedding_path = 'data/bert_embeddings/all.tsv'
+bert_label_embedding_path = 'data/bert_embeddings/labels.tsv'
+bert_data_npy = 'data/bert_embeddings/all_avg4.npy'
+bert_label_npy = 'data/bert_embeddings/labels_avg4.npy'
 validation_sum = 0.0
 for i in range(10):
     train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=bert_embedding_path,
