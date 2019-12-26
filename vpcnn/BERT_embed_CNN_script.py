@@ -21,14 +21,15 @@ parser.add_argument('-nkernels-low', type=int, default=50, help='minimum number 
 parser.add_argument('-nkernels-high', type=int, default=800, help='maximum number of each type of filters [default:800]')
 parser.add_argument('-nkernels-step', type=int, default=50, help='step size of number of each type of filters [default:50]')
 parser.add_argument('-embed-method', type=str, default='avg4', help='method of extracting embedding from BERT [default:avg4]')
+# possible embedding method: concat4, avg4, f1
 parser.add_argument('-logdir', type=str, default='./data/result.csv', help='result dir for logging')
 args = parser.parse_args()
 # these are the things I don't want to add to the argument for now, but keep them here can making it easy to make it
 # changable without changing the grid search loop
 bert_embedding_path = 'data/bert_embeddings/all.tsv'
 bert_label_embedding_path = 'data/bert_embeddings/labels.tsv'
-bert_data_npy = 'data/bert_embeddings/all_avg4.npy'
-bert_label_npy = 'data/bert_embeddings/labels_avg4.npy'
+bert_data_npy = 'data/bert_embeddings/all_'+args.embed_method+'.npy'
+bert_label_npy = 'data/bert_embeddings/labels_'+args.embed_method+'.npy'
 possible_optimizers = ['adadelta']
 validation_sum = 0.0
 """-------------previous script for try and error -----------------------------------------------------"""
@@ -61,12 +62,14 @@ def get_10fold_acc(n_kernels=500, lr=1e-3, epochs=1000, batch_size=50, optimizer
         validation_acc = bert_train.eval(test, model, batch_size=50)
         validation_sum += validation_acc
     return validation_sum/10.0
+
+
 if args.embed_method == 'concat4':
     embed_dim = 768*4
 else:
     embed_dim = 768
 result = []
-for lr in np.array_split(args.lr_low, args.lr_high+args.lr_step, args.lr_step):
+for lr in np.arange(args.lr_low, args.lr_high+args.lr_step, args.lr_step):
     for epochs in range(args.epoch_low, args.epoch_high+1, args.epoch_step):
         for batch_size in range(args.batch_low, args.batch_high+1, args.batch_step):
             for n_kernels in range(args.nkernels_low, args.nkernels_high+1, args.nkernels_step):
