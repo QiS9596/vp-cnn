@@ -77,3 +77,13 @@ class CNN_Embed(nn.Module):
         linear_out = self.fc1(x)
         return linear_out
 
+class CNN_shirnk_dim(nn.Module):
+    def __init__(self,
+                 class_num=361,
+                 kernel_num=300,
+                 kernel_sizes=[3,4,5],
+                 embed_dim=3072,
+                 dropout=0.5,
+                 conv_init='default',
+                 fc_init='default'):
+        pass
