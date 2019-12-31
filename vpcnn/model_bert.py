@@ -1,8 +1,10 @@
 """
 This module contains CNN network that directly eat bert embeddings, with similar function as model.py
 """
+import copy
 from abc import ABC, abstractmethod
 
+import bert_train
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -83,6 +85,10 @@ class CNN_Embed(nn.Module):
 
 
 class BaseAutoEncoderDecoder(nn.Module, ABC):
+    """
+    Base class of autoencoders, should provide forward, encode, decode and training method
+    """
+
     def __init__(self, layers=[3072, 1500, 800, 399]):
         super(BaseAutoEncoderDecoder, self).__init__()
         self.neuron_num = layers
@@ -97,10 +103,24 @@ class BaseAutoEncoderDecoder(nn.Module, ABC):
 
     @staticmethod
     def pre_train(mdl, train, optimizer='adadelta', lr=1e-4, batch_size=50, use_cuda=True):
+        """
+        Train the model
+        :param mdl: the autoencoder decoder to be trained
+        :param train: training data attributes
+        :param optimizer: optimizer to be used
+        :param lr: learning rate
+        :param batch_size: batch size
+        :param use_cuda: weather to use cuda
+        :return: a deep copy of model
+        """
         pass
 
 
 class AutoEncoderDecoder(BaseAutoEncoderDecoder):
+    """
+    A simple autoencoder-decoder built with fully-connected feed-forward network
+    """
+
     def __init__(self, layers=[3072, 1500, 800, 300]):
         super(AutoEncoderDecoder, self).__init__()
         _layers = []
@@ -128,6 +148,10 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
 
     @staticmethod
     def pre_train(mdl, train, optimizer='adadelta', lr=1e-4, batch_size=50, use_cuda=True, epochs=50):
+        """
+        Definition of parameters see super class
+        Train the auto-encoder-decoder in a simple manner
+        """
         if use_cuda:
             mdl.cuda()
         if optimizer == 'adadelta':
@@ -138,9 +162,17 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
             _optimizer = torch.optim.Adam(mdl.parameters(), lr=lr)
         mdl.train()
         best_loss = 1000
-        berst_mdl = None
-        # TODO: train autoencoder decoder
+        best_mdl = None
 
+        train_batches_ = bert_train.generate_batches(dataset=train, batch_size=batch_size, shuffle=False,
+                                                     drop_last=False)
+        train_batches = []
+        for batch in train_batches_:
+            train_batches.append(copy.deepcopy(batch))
+        for epoch in range(epochs + 1):
+            # fit model on batch
+            pass
+            # TODO: train autoencoder decoder
 
 
 class CNN_shirnk_dim(nn.Module):
