@@ -174,7 +174,7 @@ class AutoEncoderPretrainDataset(Dataset):
         self.df = df
 
     def __getitem__(self, index):
-        return {'label': self.df.iloc[index]['labels'], 'embed': self.df.iloc[index]['embed']}
+        return {'embed': self.df.iloc[index]['embed']}
 
     def __len__(self):
         return len(list(self.df.index))

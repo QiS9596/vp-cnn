@@ -102,14 +102,15 @@ class BaseAutoEncoderDecoder(nn.Module, ABC):
         pass
 
     @staticmethod
-    def pre_train(mdl, train, optimizer='adadelta', lr=1e-4, batch_size=50, use_cuda=True):
+    def pre_train(mdl, train, optimizer='adadelta', lr=1e-4, batch_size=50, early_stop_loss=1e-2, use_cuda=True):
         """
         Train the model
         :param mdl: the autoencoder decoder to be trained
-        :param train: training data attributes
+        :param train: vp_dataset_bert.VPDataset_bert_embedding: training data
         :param optimizer: optimizer to be used
         :param lr: learning rate
         :param batch_size: batch size
+        :param early_stop_loss: loss for early stopping, the value is based on mean square loss
         :param use_cuda: weather to use cuda
         :return: a deep copy of model
         """
@@ -147,7 +148,8 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
         return self.decode(x)
 
     @staticmethod
-    def pre_train(mdl, train, optimizer='adadelta', lr=1e-4, batch_size=50, use_cuda=True, epochs=50):
+    def pre_train(mdl, train, optimizer='adadelta', lr=1e-4, batch_size=50, early_stop_loss=1e-2, use_cuda=True,
+                  epochs=50):
         """
         Definition of parameters see super class
         Train the auto-encoder-decoder in a simple manner
@@ -158,7 +160,7 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
             _optimizer = torch.optim.Adadelta(mdl.parameters(), rho=0.95)
         elif optimizer == 'sgd':
             _optimizer = torch.optim.SGD(mdl.parameters(), lr=lr)
-        elif optimizer == 'adam':
+        else:
             _optimizer = torch.optim.Adam(mdl.parameters(), lr=lr)
         mdl.train()
         best_loss = 1000
@@ -171,8 +173,29 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
             train_batches.append(copy.deepcopy(batch))
         for epoch in range(epochs + 1):
             # fit model on batch
-            pass
-            # TODO: train autoencoder decoder
+            batch_idx = 0
+            avg_loss = 0
+            for batch in train_batches:
+                feature = batch['embed']
+                target = batch['embed']
+                # step 1: set optimizer to zero grad
+                _optimizer.zero_grad()
+                # step 2: make prediction
+                output = mdl(feature)
+                target = autograd.Variable(target).cuda()
+                # step 3: compute loss, using mse
+                loss = F.mse_loss(input=output, target=target)
+                # step 4: use loss to produce gradient
+                loss.backward()
+                # step 5: update weights
+                _optimizer.step()
+                batch_idx += 1
+                avg_loss += loss
+            avg_loss /= len(train_batches)
+            mdl_ = copy.deepcopy(mdl)
+            if avg_loss < early_stop_loss:
+                break
+        return mdl_
 
 
 class CNN_shirnk_dim(nn.Module):
