@@ -3,7 +3,7 @@ This module contains CNN network that directly eat bert embeddings, with similar
 """
 import copy
 from abc import ABC, abstractmethod
-
+import vp_dataset_bert
 import bert_train
 import torch
 import torch.nn as nn
@@ -102,7 +102,8 @@ class BaseAutoEncoderDecoder(nn.Module, ABC):
         pass
 
     @staticmethod
-    def pre_train(mdl, train, optimizer='adadelta', lr=1e-4, batch_size=50, early_stop_loss=1e-2, use_cuda=True):
+    def pre_train(mdl, train, optimizer='adadelta', lr=1e-4, batch_size=50, early_stop_loss=1e-2, use_cuda=True,
+                  epochs=50):
         """
         Train the model
         :param mdl: the autoencoder decoder to be trained
@@ -112,9 +113,9 @@ class BaseAutoEncoderDecoder(nn.Module, ABC):
         :param batch_size: batch size
         :param early_stop_loss: loss for early stopping, the value is based on mean square loss
         :param use_cuda: weather to use cuda
-        :return: a deep copy of model
+        :return: tuple of loss and a deep copy of trained model
         """
-        pass
+        return None, None
 
 
 class AutoEncoderDecoder(BaseAutoEncoderDecoder):
@@ -163,8 +164,8 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
         else:
             _optimizer = torch.optim.Adam(mdl.parameters(), lr=lr)
         mdl.train()
-        best_loss = 1000
-        best_mdl = None
+        # best_loss = 1000
+        # best_mdl = None
 
         train_batches_ = bert_train.generate_batches(dataset=train, batch_size=batch_size, shuffle=False,
                                                      drop_last=False)
@@ -195,7 +196,7 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
             mdl_ = copy.deepcopy(mdl)
             if avg_loss < early_stop_loss:
                 break
-        return mdl_
+        return avg_loss, mdl_
 
 
 class CNN_shirnk_dim(nn.Module):
@@ -218,8 +219,115 @@ class CNN_shirnk_dim(nn.Module):
                                    fc_init=fc_init
                                    )
         if embed_dim == 3072:
-            auto_encoder_layers = [3072, 1500, 800, 300]
+            auto_encoder_layers = [3072, 1500, 800, shrinked_dim]
         elif embed_dim == 768:
-            auto_encoder_layers = [768, 500, 300]
+            auto_encoder_layers = [768, 500, shrinked_dim]
         if shrink_method == 's_encoder':
             self.auto_encoder = AutoEncoderDecoder(auto_encoder_layers)
+
+    def pre_train(self, train, optimizer='adadelta', lr=1e-4, batch_size=50, early_step_loss=1e-2, use_cuda=True,
+                  epochs=50):
+        """
+        Pre-train the autoencoder part for dimensionality reduction on embeddings.
+        :param train: here refers to the vp_dataset_bert.VPDataset_bert_embedding object
+        parameter definition see BaseAutoEncoderDecoder.pre_train
+        """
+        # get AutoEncoderPretrainDataset object from the CNN dataset
+        train_ = vp_dataset_bert.AutoEncoderPretrainDataset.from_VPDataset_bert_embedding(train)
+        loss, self.auto_encoder = BaseAutoEncoderDecoder.pre_train(self.auto_encoder,
+                                                                   train=train_,
+                                                                   optimizer=optimizer,
+                                                                   lr=lr,
+                                                                   batch_size=batch_size,
+                                                                   early_stop_loss=early_step_loss,
+                                                                   use_cuda=use_cuda,
+                                                                   epochs=epochs)
+        print('Pre-training of auto-encoder ends, with loss of ' + str(loss))
+
+    def forward(self, x):
+        """
+        Forward and predict output
+        the function first use the autoencoder to reduce the dimensionality of each word vector to shrinked_dim,
+        then feed the shirnked embedding to CNN classifier
+        :param x: input sentence embedding
+        :return: predicted class (softmax output to meet one hot encoding)
+        """
+        x = self.auto_encoder.encode(x)
+        y = self.cnn_model(x)
+        return y
+
+    @staticmethod
+    def mdl_train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, epochs=25, batch_size=50,
+                  max_norm=3.0, no_always_norm=False):
+        """
+        Training method for CNN_shirnk_dim
+        :param train: training dataset object
+        :param dev: development dataset object
+        :param model: model object to be trained
+        :param optimizer: str; for choosing optimizer
+        :param use_cuda: bool; for using cuda or not
+        :param lr: float; learning rate
+        :param l2: l2 regularization of optimizer
+        :param epochs: int; max number of epochs
+        :param batch_size: int; batch size
+        :param max_norm: float; l2 constraint for parameters
+        :param no_always_norm: boolean
+        :return: tuple of acc and copy of best model
+        """
+
+        if use_cuda:
+            model.cuda()
+        if optimizer == 'adam':
+            optimizer_ = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2)
+        elif optimizer == 'sgd':
+            optimizer_ = torch.optim.SGD(model.parameters(), lr=lr, weight_decay=l2)
+        elif optimizer == 'adadelta':
+            optimizer_ = torch.optim.Adadelta(model.prameters(), rho=0.95)
+        # set trainable
+        model.train()
+        model.auto_encoder.train(mode=False)
+        model.cnn_model.train()
+        # initialize some placeholder for best model
+        best_acc = 0
+        best_model = None
+        # generate batchs
+        train_batchs_ = bert_train.generate_batches(dataset=train, batch_size=batch_size, shuffle=False, drop_last=False)
+        train_batchs = []
+        for batch in train_batchs_:
+            train_batchs.append(copy.deepcopy(batch))
+        # begin training
+        for epoch in range(1, epochs+1):
+            batch_idx = 0
+            for batch in train_batchs:
+                feature = batch['embed']
+                target = batch['label']
+
+                # step 1: set optimizer to zero grad
+                optimizer_.zero_grad()
+                # step 2: make prediction
+                logit = model(feature)
+                target = autograd.Variable(target).cuda()
+                # step 3: compute loss, cross entropy is used
+                loss = F.cross_entropy(input=logit, target=target)
+                # step 4: use loss to produce gradient
+                loss.backward()
+                # step 4: update weights
+                optimizer_.step()
+
+                batch_idx += 1
+
+                if max_norm > 0:
+                    if not no_always_norm:
+                        for row in model.cnn_model.fc1.weight.data:
+                            norm = row.norm() + 1e-7
+                            row.div_(norm).mul_(max_norm)
+                    else:
+                        model.cnn_model.fc1.weight.data.renorm_(2, 0, max_norm)
+            acc = bert_train.eval(dev, model, batch_size, use_cuda)
+            if acc > best_acc:
+                best_model = copy.deepcopy(model)
+        # end training
+        model = best_model
+        acc = bert_train.eval(dev, model, batch_size, use_cuda)
+        return acc, model
+

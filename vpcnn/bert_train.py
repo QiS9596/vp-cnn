@@ -1,5 +1,6 @@
 """
 The model provides training and evaluation method similar to train.py but compatible with bert cnn models
+for CNN_shirnk_dim training method is attached as class static method
 """
 import os
 import sys
@@ -61,7 +62,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
     if optimizer == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2)
     elif optimizer == 'sgd':
-        optimizer = torch.optim.SGD(model.parameters, lr=lr, weight_decay=l2)
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr, weight_decay=l2)
     elif optimizer == 'adadelta':
         optimizer = torch.optim.Adadelta(model.parameters(), rho=0.95)
     steps = 0
