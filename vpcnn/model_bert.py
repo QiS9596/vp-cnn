@@ -225,7 +225,7 @@ class CNN_shirnk_dim(nn.Module):
         if shrink_method == 's_encoder':
             self.auto_encoder = AutoEncoderDecoder(auto_encoder_layers)
 
-    def pre_train(self, train, optimizer='adadelta', lr=1e-4, batch_size=50, early_step_loss=1e-2, use_cuda=True,
+    def pre_train(self, train, optimizer='adadelta', lr=1e-4, batch_size=50, early_stop_loss=1e-2, use_cuda=True,
                   epochs=50):
         """
         Pre-train the autoencoder part for dimensionality reduction on embeddings.
@@ -239,7 +239,7 @@ class CNN_shirnk_dim(nn.Module):
                                                                    optimizer=optimizer,
                                                                    lr=lr,
                                                                    batch_size=batch_size,
-                                                                   early_stop_loss=early_step_loss,
+                                                                   early_stop_loss=early_stop_loss,
                                                                    use_cuda=use_cuda,
                                                                    epochs=epochs)
         print('Pre-training of auto-encoder ends, with loss of ' + str(loss))

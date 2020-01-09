@@ -58,7 +58,7 @@ def get_10fold_acc(n_kernels=500, lr=1e-3, epochs=1000, batch_size=50, optimizer
                                                                            label_npy_name=bert_label_npy,
                                                                            num_experts=0)
         mdl = model_bert.CNN_Embed(kernel_num=n_kernels,embed_dim=embed_dim)
-        acc,model = bert_train.train(train=train, dev=dev, optimizer=optimizer, model=mdl, lr=lr, epochs=epochs, batch_size=batch_size)
+        acc,model = bert_train.train_wraper(train=train, dev=dev, optimizer=optimizer, model=mdl, lr=lr, epochs=epochs, batch_size=batch_size)
         validation_acc = bert_train.eval(test, model, batch_size=50)
         validation_sum += validation_acc
     return validation_sum/10.0
