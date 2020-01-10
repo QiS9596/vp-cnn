@@ -4,9 +4,11 @@ for CNN_shirnk_dim training method is attached as class static method
 """
 import copy
 
+import model_bert
 import torch
 import torch.autograd as autograd
 import torch.nn.functional as F
+import vp_dataset_bert
 from torch.utils.data import DataLoader
 
 
@@ -115,9 +117,10 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
     return acc, model
 
 
-def train_wraper(train_iter, dev_iter, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, epochs=25, batch_size=50,
+def train_wraper(train_iter, dev_iter, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, epochs=25,
+                 batch_size=50,
                  max_norm=3.0, no_always_norm=False, pretrain_optimizer='adadelta', pretrain_lr=1e-4,
-                 pretrain_batch_size = 50, pretrain_early_stop_loss=1e-2, pretrain_epochs=50, mode='plain_cnn'):
+                 pretrain_batch_size=50, pretrain_early_stop_loss=1e-2, pretrain_epochs=50, mode='plain_cnn'):
     """
     A wrapper of train function for different models
     Current training mode
@@ -152,8 +155,13 @@ def train_wraper(train_iter, dev_iter, model, optimizer='adam', use_cuda=True, l
         # TODO
         pass
     if mode == 'auto_encoder_decoder':
-        # TODO
-        pass
+        collapsed_train = vp_dataset_bert.AutoEncoderPretrainDateset.from_VPDataset_bert_embedding(train_iter)
+        return model_bert.AutoEncoderDecoder.pre_train(model, collapsed_train, optimizer=pretrain_optimizer,
+                                                       lr=pretrain_lr,
+                                                       batch_size=pretrain_batch_size,
+                                                       early_stop_loss=pretrain_early_stop_loss,
+                                                       use_cuda=use_cuda, epochs=pretrain_epochs)
+
 
 def eval(data_iter, model, batch_size, use_cuda=True):
     """
@@ -189,6 +197,28 @@ def eval(data_iter, model, batch_size, use_cuda=True):
                                                                     corrects,
                                                                     len(data_iter)))
     return accuracy
+
+
+def eval_wraper(data_iter, model, batch_size, use_cuda=True, mode='classifier'):
+    """
+    A wrapper of training different models
+    Current training mode
+    'classifier', 'plain_cnn', 'cnn_shirnk_dim': refers to the sentence classifiers
+    'autoencoder': refers to the auto-encoder-decoder reconstruction loss.
+    :param data_iter: vp_dataset_bert.VPDataset_bert_embedding; evaluation (development/test dataset)
+    :param model: model to be trained, should be in model_bert
+    :param batch_size: int; size of each batch
+    :param use_cuda: boolean; if to use cuda
+    :param mode: str: use to configure evalution method; for classifier or auto-encoder
+    :return: accuracy or mse loss, depends on the more
+    """
+    classifier_modes = ['classifier', 'plain_cnn', 'cnn_shirnk_dim']
+    if mode in classifier_modes:
+        return eval(data_iter=data_iter, model=model, batch_size=batch_size, use_cuda=use_cuda)
+    elif mode == 'autoencoder':
+        data_iter_ = vp_dataset_bert.AutoEncoderPretrainDateset.from_VPDataset_bert_embedding(vp_dataset_bert=data_iter)
+        return model_bert.AutoEncoderDecoder.eval_mdl(data_iter=data_iter_, model=model, batch_size=batch_size,
+                                                      use_cuda=use_cuda)
 
 
 def ensemble_predict(batch_feature, batch_target, models):

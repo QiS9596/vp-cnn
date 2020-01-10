@@ -117,6 +117,18 @@ class BaseAutoEncoderDecoder(nn.Module, ABC):
         """
         return None, None
 
+    @staticmethod
+    def eval_mdl(data_iter, model, batch_size, use_cuda=True):
+        """
+        evaluation method for auto_encoder_decoder
+        :param data_iter: dataset object for evaluation
+        :param model: model object to be evaluated
+        :param batch_size: size of mini batch
+        :param use_cuda: bool; if to use cuda
+        :return: average reconstruction loss (mse) measured on given dataset
+        """
+        return 0.0
+
 
 class AutoEncoderDecoder(BaseAutoEncoderDecoder):
     """
@@ -197,6 +209,31 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
             if avg_loss < early_stop_loss:
                 break
         return avg_loss, mdl_
+    @staticmethod
+    def eval_mdl(data_iter, model, batch_size, use_cuda=True):
+        """
+        evaluation method for auto_encoder_decoder
+        :param data_iter: dataset object for evaluation
+        :param model: model object to be evaluated
+        :param batch_size: size of mini batch
+        :param use_cuda: bool; if to use cuda
+        :return: average reconstruction loss (mse) measured on given dataset
+        """
+        model.eval()
+        batchs_ = bert_train.generate_batches(dataset=data_iter, batch_size=batch_size, shuffle=False, drop_last=False)
+        if use_cuda:
+            model.cuda()
+        avg_loss = 0.0
+        for batch in batchs_:
+            feature = batch['embed']
+            target = batch['embed']
+            target = autograd.Variable(target).cuda()
+            logit = model(feature)
+            loss = F.mse_loss(input=logit, target=target)
+            avg_loss += loss.data[0]
+        avg_loss /= len(data_iter)
+        print('\nEvalutaion - Dense autoencoder: loss: {.6f}'.format(avg_loss))
+        return avg_loss
 
 
 class CNN_shirnk_dim(nn.Module):
@@ -299,6 +336,10 @@ class CNN_shirnk_dim(nn.Module):
         for epoch in range(1, epochs+1):
             batch_idx = 0
             for batch in train_batchs:
+                model.train()
+                model.auto_encoder.train(mode=False)
+                model.cnn_model.train()
+
                 feature = batch['embed']
                 target = batch['label']
 
