@@ -155,7 +155,7 @@ def train_wraper(train_iter, dev_iter, model, optimizer='adam', use_cuda=True, l
         # TODO
         pass
     if mode == 'auto_encoder_decoder':
-        collapsed_train = vp_dataset_bert.AutoEncoderPretrainDateset.from_VPDataset_bert_embedding(train_iter)
+        collapsed_train = vp_dataset_bert.AutoEncoderPretrainDataset.from_VPDataset_bert_embedding(train_iter)
         return model_bert.AutoEncoderDecoder.pre_train(model, collapsed_train, optimizer=pretrain_optimizer,
                                                        lr=pretrain_lr,
                                                        batch_size=pretrain_batch_size,
