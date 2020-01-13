@@ -192,8 +192,10 @@ class AutoEncoderPretrainDataset(Dataset):
         # we'll use a loop to traverse the dataframe to collapse the sentence structure
         # which might not be a best implementation
         word_embeddings = []
-        for index in range(len(list(embeddings.index))):
+        for index in list(embeddings.index):
             # for each sentence we destroy the sentence structure and extends to the sequence of just embedding
+
             word_embeddings += embeddings.get(index).tolist()
-        word_embeddings_df = pd.DataFrame(data=word_embeddings, columns=['embed'])
+        word_embeddings_df = pd.DataFrame()
+        word_embeddings_df['embed'] = word_embeddings
         return cls(word_embeddings_df)
