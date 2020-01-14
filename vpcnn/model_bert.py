@@ -150,11 +150,13 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
         self.decoder = nn.Sequential(*_layers)
 
     def encode(self, x):
+        # x = torch.stack(x).view(1,-1)
+        
         x = autograd.Variable(x.float()).cuda()
         return self.encoder(x)
 
     def decode(self, x):
-        return self.decode(x)
+        return self.decoder(x)
 
     def forward(self, x):
         x = self.encode(x)

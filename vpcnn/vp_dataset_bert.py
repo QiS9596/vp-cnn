@@ -196,6 +196,9 @@ class AutoEncoderPretrainDataset(Dataset):
             # for each sentence we destroy the sentence structure and extends to the sequence of just embedding
 
             word_embeddings += embeddings.get(index).tolist()
+        def to_ndarray(list):
+            return np.array(list)
         word_embeddings_df = pd.DataFrame()
         word_embeddings_df['embed'] = word_embeddings
+        word_embeddings_df['embed'] = word_embeddings_df['embed'].apply(to_ndarray)
         return cls(word_embeddings_df)
