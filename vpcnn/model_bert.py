@@ -151,7 +151,6 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
 
     def encode(self, x):
         # x = torch.stack(x).view(1,-1)
-        
         x = autograd.Variable(x.float()).cuda()
         return self.encoder(x)
 
@@ -197,9 +196,10 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
                 _optimizer.zero_grad()
                 # step 2: make prediction
                 output = mdl(feature)
-                target = autograd.Variable(target).cuda()
+                target = autograd.Variable(target.float()).cuda()
                 # step 3: compute loss, using mse
-                loss = torch.nn.MSELoss()(input=output, target=target)
+                loss = torch.nn.MSELoss()
+                loss = loss(output, target)
                 # step 4: use loss to produce gradient
                 loss.backward()
                 # step 5: update weights
@@ -231,7 +231,8 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
             target = batch['embed']
             target = autograd.Variable(target).cuda()
             logit = model(feature)
-            loss = torch.nn.MSELoss()(input=logit, target=target)
+            loss = torch.nn.MSELoss()
+            loss = loss(logit, target)
             avg_loss += loss.data[0]
         avg_loss /= len(data_iter)
         print('\nEvalutaion - Dense autoencoder: loss: {.6f}'.format(avg_loss))
