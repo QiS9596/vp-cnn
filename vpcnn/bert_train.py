@@ -204,7 +204,7 @@ def eval_wraper(data_iter, model, batch_size, use_cuda=True, mode='classifier'):
     A wrapper of training different models
     Current training mode
     'classifier', 'plain_cnn', 'cnn_shirnk_dim': refers to the sentence classifiers
-    'autoencoder': refers to the auto-encoder-decoder reconstruction loss.
+    'auto_encoder_decoder': refers to the auto-encoder-decoder reconstruction loss.
     :param data_iter: vp_dataset_bert.VPDataset_bert_embedding; evaluation (development/test dataset)
     :param model: model to be trained, should be in model_bert
     :param batch_size: int; size of each batch
@@ -215,8 +215,8 @@ def eval_wraper(data_iter, model, batch_size, use_cuda=True, mode='classifier'):
     classifier_modes = ['classifier', 'plain_cnn', 'cnn_shirnk_dim']
     if mode in classifier_modes:
         return eval(data_iter=data_iter, model=model, batch_size=batch_size, use_cuda=use_cuda)
-    elif mode == 'autoencoder':
-        data_iter_ = vp_dataset_bert.AutoEncoderPretrainDateset.from_VPDataset_bert_embedding(vp_dataset_bert=data_iter)
+    elif mode == 'auto_encoder_decoder':
+        data_iter_ = vp_dataset_bert.AutoEncoderPretrainDataset.from_VPDataset_bert_embedding(data_iter)
         return model_bert.AutoEncoderDecoder.eval_mdl(data_iter=data_iter_, model=model, batch_size=batch_size,
                                                       use_cuda=use_cuda)
 

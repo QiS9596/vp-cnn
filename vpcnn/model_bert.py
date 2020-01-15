@@ -151,6 +151,7 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
 
     def encode(self, x):
         # x = torch.stack(x).view(1,-1)
+        print(x.size())
         x = autograd.Variable(x.float()).cuda()
         return self.encoder(x)
 
@@ -221,6 +222,7 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
         :param use_cuda: bool; if to use cuda
         :return: average reconstruction loss (mse) measured on given dataset
         """
+        print('autoencoder.eval invoked')
         model.eval()
         batchs_ = bert_train.generate_batches(dataset=data_iter, batch_size=batch_size, shuffle=False, drop_last=False)
         if use_cuda:
@@ -229,13 +231,13 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
         for batch in batchs_:
             feature = batch['embed']
             target = batch['embed']
-            target = autograd.Variable(target).cuda()
+            target = autograd.Variable(target.float()).cuda()
             logit = model(feature)
             loss = torch.nn.MSELoss()
             loss = loss(logit, target)
             avg_loss += loss.data[0]
         avg_loss /= len(data_iter)
-        print('\nEvalutaion - Dense autoencoder: loss: {.6f}'.format(avg_loss))
+        print('\nEvalutaion - Dense autoencoder: loss: {}'.format(avg_loss))
         return avg_loss
 
 
