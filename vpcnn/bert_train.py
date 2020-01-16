@@ -148,6 +148,7 @@ def train_wraper(train_iter, dev_iter, model, optimizer='adam', use_cuda=True, l
     :param mode: str; different training mode refers to training function of different models
     :return: tuple of acc and copy of best model
     """
+    print(mode)
     if mode == 'plain_cnn':
         return train(train=train_iter, dev=dev_iter, model=model, optimizer=optimizer, use_cuda=use_cuda, lr=lr, l2=l2,
                      epochs=epochs, batch_size=batch_size, max_norm=max_norm, no_always_norm=no_always_norm)
@@ -156,6 +157,8 @@ def train_wraper(train_iter, dev_iter, model, optimizer='adam', use_cuda=True, l
         pass
     if mode == 'auto_encoder_decoder':
         collapsed_train = vp_dataset_bert.AutoEncoderPretrainDataset.from_VPDataset_bert_embedding(train_iter)
+        print(type(collapsed_train))
+        print(collapsed_train.df['embed'][0])
         return model_bert.AutoEncoderDecoder.pre_train(model, collapsed_train, optimizer=pretrain_optimizer,
                                                        lr=pretrain_lr,
                                                        batch_size=pretrain_batch_size,
