@@ -192,16 +192,18 @@ class AutoEncoderPretrainDataset(Dataset):
         # we'll use a loop to traverse the dataframe to collapse the sentence structure
         # which might not be a best implementation
         word_embeddings = []
-        print(embeddings[0].shape)
-        print(embeddings[0][0].shape)
-        print(embeddings[0][0])
-        for index in list(embeddings.index):
+        #for index in list(embeddings.index):
             # for each sentence we destroy the sentence structure and extends to the sequence of just embedding
 
-            word_embeddings += embeddings.get(index).tolist()
-        def to_ndarray(list):
-            return np.array(list)
+        #    word_embeddings += embeddings.get(index).tolist()
+        embeddings = embeddings.to_list()
+        for sentence in embeddings:
+            #word_embeddings += sentence.reshape(-1, embed_dim)
+            word_embeddings += np.split(sentence, sentence.shape[0],1)
+        #def to_ndarray(list):
+        #    return np.array(list)
         word_embeddings_df = pd.DataFrame()
         word_embeddings_df['embed'] = word_embeddings
-        word_embeddings_df['embed'] = word_embeddings_df['embed'].apply(to_ndarray)
+        print(word_embeddings_df.to_numpy().shape)
+        #word_embeddings_df['embed'] = word_embeddings_df['embed'].apply(to_ndarray)
         return cls(word_embeddings_df)

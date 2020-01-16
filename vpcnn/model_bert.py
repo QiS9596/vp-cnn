@@ -222,7 +222,6 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
         :param use_cuda: bool; if to use cuda
         :return: average reconstruction loss (mse) measured on given dataset
         """
-        print('autoencoder.eval invoked')
         model.eval()
         batchs_ = bert_train.generate_batches(dataset=data_iter, batch_size=batch_size, shuffle=False, drop_last=False)
         if use_cuda:
