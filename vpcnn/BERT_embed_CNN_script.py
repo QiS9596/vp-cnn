@@ -108,7 +108,7 @@ def get_10fold_acc(n_kernels=500, lr=1e-3, epochs=1000, batch_size=50, optimizer
                                                   pretrain_early_stop_loss=pretrain_early_stop_loss,
                                                   pretrain_epochs=pretrain_epochs,
                                                   mode='auto_encoder_decoder')
-            validation_loss = bert_train.eval_wraper(test, model, batch_size=50)
+            validation_loss = bert_train.eval_wraper(test, model, batch_size=50, mode='auto_encoder_decoder')
             validation_sum += validation_loss
 
     return validation_sum/10.0

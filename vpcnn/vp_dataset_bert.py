@@ -180,7 +180,7 @@ class AutoEncoderPretrainDataset(Dataset):
         return len(list(self.df.index))
 
     @classmethod
-    def from_VPDataset_bert_embedding(cls, vpdataset):
+    def from_VPDataset_bert_embedding(cls, vpdataset, embed_dim=768):
         """
         Takes a VPDataset_bert_embedding, and collapse the sequences of word embeddings into a collection of word
         embeddings, then emcapsulate with AutoEncoderPretrainDataset
@@ -192,10 +192,18 @@ class AutoEncoderPretrainDataset(Dataset):
         # we'll use a loop to traverse the dataframe to collapse the sentence structure
         # which might not be a best implementation
         word_embeddings = []
-        for index in list(embeddings.index):
+        #for index in list(embeddings.index):
             # for each sentence we destroy the sentence structure and extends to the sequence of just embedding
 
-            word_embeddings += embeddings.get(index).tolist()
+        #    word_embeddings += embeddings.get(index).tolist()
+        embeddings = embeddings.to_list()
+        for sentence in embeddings:
+            #word_embeddings += sentence.reshape(-1, embed_dim)
+            word_embeddings += np.split(sentence, sentence.shape[0],1)
+        #def to_ndarray(list):
+        #    return np.array(list)
         word_embeddings_df = pd.DataFrame()
         word_embeddings_df['embed'] = word_embeddings
+        print(word_embeddings_df.to_numpy().shape)
+        #word_embeddings_df['embed'] = word_embeddings_df['embed'].apply(to_ndarray)
         return cls(word_embeddings_df)
