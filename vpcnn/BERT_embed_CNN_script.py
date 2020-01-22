@@ -7,6 +7,7 @@ import bert_train
 import argparse
 import numpy as np
 import pandas as pd
+import os
 parser = argparse.ArgumentParser(description="Hyperparameter tunning for BERT-CNN(grid search)")
 parser.add_argument('-class-num', type=int, default=361, help='number of different classes [default:361]')
 parser.add_argument('-lr-low', type=float, default=1e-3, help='minimum value of learning rate [default:1e-3]')
@@ -22,6 +23,7 @@ parser.add_argument('-nkernels-low', type=int, default=50, help='minimum number 
 parser.add_argument('-nkernels-high', type=int, default=800, help='maximum number of each type of filters [default:800]')
 parser.add_argument('-nkernels-step', type=int, default=50, help='step size of number of each type of filters [default:50]')
 parser.add_argument('-embed-method', type=str, default='avg4', help='method of extracting embedding from BERT [default:avg4]')
+parser.add_argument('-data-path', type=str, default='data/bert_embeddings')
 # could be used to test cnn for bert embedding cnn, rcnn for dimensionality Reduced CNN, and aed for AutoEncoderDecoder
 parser.add_argument('-model-mode', type=str, default='cnn', help='model to be tested, possible value[cnn; rcnn; aed], [default:cnn]')
 # the pretrain aruguments are only used for rcnn and aed; for rcnn, the hyperparameter of it's sub aed model would be fixed at the minimum value
@@ -39,16 +41,18 @@ parser.add_argument('-pretrain-early-stop-loss-step', type=float, default=5e-3, 
 parser.add_argument('-pretrain-epochs-low', type=int, default=25, help='grid search min epochs for aed [default:25]')
 parser.add_argument('-pretrain-epochs-high', type=int, default=1000, help='grid search max epochs for aed [default:1000]')
 parser.add_argument('-pretrain-epochs-step', type=int, default=100, help='grid search step of epochs of aed [default:100]')
+
 # parser.add_argument('-aed-layers', type=str, default='3072,1500,800,300', help='number of neurons in each layer in dense aed')
 # possible embedding method: concat4, avg4, f1
 parser.add_argument('-logdir', type=str, default='./data/result.csv', help='result dir for logging')
 args = parser.parse_args()
 # these are the things I don't want to add to the argument for now, but keep them here can making it easy to make it
 # changable without changing the grid search loop
-bert_embedding_path = 'data/bert_embeddings/all.tsv'
-bert_label_embedding_path = 'data/bert_embeddings/labels.tsv'
-bert_data_npy = 'data/bert_embeddings/all_'+args.embed_method+'.npy'
-bert_label_npy = 'data/bert_embeddings/labels_'+args.embed_method+'.npy'
+
+bert_embedding_path = os.path.join(args.data_path, 'all.tsv')
+bert_label_embedding_path = os.path.join(args.data_path, 'labels.tsv')
+bert_data_npy = os.path.join(args.data_path, 'all_'+args.embed_method+'.npy')
+bert_label_npy = os.path.join(args.data_path, 'labels_'+args.embed_method+'.npy')
 possible_optimizers = ['adadelta']
 validation_sum = 0.0
 # we keep this possible combination of layers here, if we further want to search them it would be easy to refactor
