@@ -84,6 +84,7 @@ def get_10fold_acc(n_kernels=500, lr=1e-3, epochs=1000, batch_size=50, optimizer
                    aed_layers=[768, 500, 300], pretrain_lr=1e-3, pretrain_batch_size=50, pretrain_early_stop_loss=1e-2,
                    pretrain_epochs=50):
     validation_sum = 0.0
+    print('begin 10 fold')
     for i in range(10):
         train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=bert_embedding_path,
                                                                            foldid=i,
@@ -91,6 +92,7 @@ def get_10fold_acc(n_kernels=500, lr=1e-3, epochs=1000, batch_size=50, optimizer
                                                                            train_npy_name=bert_data_npy,
                                                                            label_npy_name=bert_label_npy,
                                                                            num_experts=0)
+        print('start validation')
         if args.model_mode == 'cnn':
             mdl = model_bert.CNN_Embed(kernel_num=n_kernels, class_num = class_num, embed_dim=embed_dim)
             acc,model = bert_train.train_wraper(train_iter=train, dev_iter=dev, optimizer=optimizer, model=mdl, lr=lr, epochs=epochs, batch_size=batch_size)

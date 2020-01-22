@@ -199,11 +199,12 @@ class AutoEncoderPretrainDataset(Dataset):
         embeddings = embeddings.to_list()
         for sentence in embeddings:
             #word_embeddings += sentence.reshape(-1, embed_dim)
-            word_embeddings += np.split(sentence, sentence.shape[0],1)
+            words = np.split(sentence, sentence.shape[0])
+            words = [x.reshape(1,-1) for x in words]
+            word_embeddings += words
         #def to_ndarray(list):
         #    return np.array(list)
         word_embeddings_df = pd.DataFrame()
         word_embeddings_df['embed'] = word_embeddings
-        print(word_embeddings_df.to_numpy().shape)
         #word_embeddings_df['embed'] = word_embeddings_df['embed'].apply(to_ndarray)
         return cls(word_embeddings_df)

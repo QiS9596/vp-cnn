@@ -137,21 +137,23 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
 
     def __init__(self, layers=[3072, 1500, 800, 300]):
         super(AutoEncoderDecoder, self).__init__()
+        print(layers)
         _layers = []
         for i in range(len(layers) - 1):
             _layers.append(nn.Linear(in_features=layers[i], out_features=layers[i + 1]))
             _layers.append(nn.ReLU(True))
         self.encoder = nn.Sequential(*_layers)
+        print(self.encoder)
         _layers = []
         layers.reverse()
         for i in range(len(layers) - 1):
             _layers.append(nn.Linear(in_features=layers[i], out_features=layers[i + 1]))
             _layers.append(nn.ReLU(True))
         self.decoder = nn.Sequential(*_layers)
+        layers.reverse()
 
     def encode(self, x):
-        # x = torch.stack(x).view(1,-1)
-        print(x.size())
+        x = x.view(-1,768)
         x = autograd.Variable(x.float()).cuda()
         return self.encoder(x)
 
@@ -209,6 +211,7 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
                 avg_loss += loss
             avg_loss /= len(train_batches)
             mdl_ = copy.deepcopy(mdl)
+            print('training dense auto encoder decoder at epoch' + str(epoch) + ' with loss '+ str(avg_loss))
             if avg_loss < early_stop_loss:
                 break
         return avg_loss, mdl_
