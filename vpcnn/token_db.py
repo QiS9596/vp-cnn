@@ -1,9 +1,13 @@
 """
 This module provide tools for applying analysis towards bert embeddings
 """
+import json
 import sqlite3
-import numpy as np
+import time
 from string import punctuation
+
+import numpy as np
+
 
 class BERTDBProcessor:
     """
@@ -66,7 +70,8 @@ class BERTDBProcessor:
         self.c.execute("""
             SELECT * FROM sqlite_master WHERE type='table'
         """)
-        print(self.c.fetchall())
+        for table in self.c.fetchall():
+            print(table)
         self.conn.commit()
 
     def create_dataset_table(self, table_name):
@@ -175,7 +180,6 @@ class BERTDBProcessor:
         self.conn.commit()
         return result
 
-
     def dump_table(self, table_name):
         """
         This function will print every data entry in the target table with the name table_name
@@ -213,6 +217,76 @@ class BERTDBProcessor:
                 DROP TABLE {}
             """.format(table[0]))
             self.conn.commit()
+
+    def increment_token_count(self, dataset_name, token_name, increment_amount=1):
+        """
+        Increment the count of target token in target dataset table
+        :param dataset_name: name of the target dataset
+        :param token_name: name of the target token
+        :param increment_amount: int; the amount that increments upon the current count
+        :return: False if target dataset or token does not exist; True otherwise
+        """
+        # we directly check the correspond dataset_name_token table
+        table_name = dataset_name + '_' + token_name
+        self.c.execute("""
+            SELECT * FROM sqlite_master WHERE type='table' and name=?
+        """, [table_name])
+        self.conn.commit()
+        if len(self.c.fetchall()) <= 0: return False
+
+        # get the current count
+        self.c.execute("""
+            SELECT count FROM {} WHERE token=?
+        """.format(dataset_name), [token_name])
+        count = self.c.fetchone()[0]
+        # store the new_count into target location
+        new_count = count + increment_amount
+        self.c.execute("""
+            UPDATE {} SET count=? WHERE token=?
+        """.format(dataset_name), [new_count, token_name])
+        self.conn.commit()
+        return True
+
+    def load_dataset(self, bert_json_file, dataset_name):
+        """
+        This function load the target bert json file into the target dataset table/table with target dataset prefix
+        This function will first check if the correspond table exists, if not, will create correspond table
+        :param bert_json_file: path to target bert json file
+        :return:
+        """
+        self.create_dataset_table(dataset_name)
+        progress = 0
+        file_lines = self.getline(bert_json_file)
+        with open(bert_json_file) as file:
+            start = time.time()
+            for line in file.readlines():
+                line_dict = json.loads(line)
+                lineidx = line_dict['linex_index']
+                features = line_dict['features']
+                for i in range(len(features)):
+                    token = features[i]
+                    token_name = self.rmv_punc(token['token'])
+                    self.create_dataset_token_table(dataset_name, token_name)
+                    self.increment_token_count(dataset_name, token_name)
+                    for layer in token['layers']:
+                        layeridx = layer['index']
+                        embed = np.array(layer['values'])
+                        self.insert_embedding(dataset_name, token_name,
+                                              layer=layeridx, embedding=embed, lineidx=lineidx, positionidx=i)
+                if progress % 100 == 0:
+                    unfinshed = file_lines - progress
+                    time_used = time.time() - start
+                    estimated_finish = time_used / (progress+1) * unfinshed
+                    print("Current Progress {}/{}, has already work on job for {}, estimated end in {} sec".format(
+                        progress, file_lines, time_used, estimated_finish))
+                progress += 1
+
+    @staticmethod
+    def getline(file):
+        with open(file) as f:
+            for i, l in enumerate(f):
+                pass
+        return i + 1
 
     @staticmethod
     def rmv_punc(string_):
