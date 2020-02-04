@@ -254,11 +254,13 @@ class BERTDBProcessor:
         :param bert_json_file: path to target bert json file
         :return:
         """
+        print('start to load dataset')
         self.create_dataset_table(dataset_name)
         progress = 0
         file_lines = self.getline(bert_json_file)
         with open(bert_json_file) as file:
             start = time.time()
+            print(start)
             for line in file.readlines():
                 line_dict = json.loads(line)
                 lineidx = line_dict['linex_index']
