@@ -162,7 +162,7 @@ class BERTDBProcessor:
         generated use np.array.dumps() method and could be used to reconstruct np.array with np.loads()
         :param dataset_name: string; name of the correspond dataset
         :param token_name: string; name of the target token
-        :return: None if the table of target dataset_name_token table does not exist; otherwise a list
+        :return: False if the table of target dataset_name_token table does not exist; otherwise a list
         """
         table_name = dataset_name + '_' + token_name
         # check if the target table exists
@@ -178,6 +178,79 @@ class BERTDBProcessor:
         """.format(table_name))
         result = self.c.fetchall()
         self.conn.commit()
+        return self.unpack_fetch_all_embeddings(result)
+
+    def get_embeddings_on_row(self, dataset_name, token_name, line_ids, layer):
+        """
+        get a collection of word embedding for selected appearances of target token
+        the token is selected by lineidx field, which is the index of the example in the training set
+        :param dataset_name: name of the dataset
+        :param token_name: name of the token
+        :param line_ids: a list of integer, each one represents a line idl; could also be None, in this case return
+        search among entire dataset
+        :param layer: str or int, layer for embedding; should correspond to -1 to -12 and other method of extracting
+        embeddings
+        :return: False if the table of target dataset_name_token does not exist; otherwise a list of numpy.array
+        """
+        layer = str(layer)
+        table_name = dataset_name + '_' + token_name
+        # check if the target table exists
+        self.c.execute("""
+            SELECT * FROM sqlite_master WHERE type ='table' AND name=?;
+        """, [table_name])
+        self.conn.commit()
+        if len(self.c.fetchall()) <= 0:
+            return False
+        # if line_ids is None
+        if line_ids is None:
+            self.c.execute("""
+                SELECT embedding FROM {} WHERE layer=?
+            """, [layer])
+        else:
+            str_list_sql = '('
+            for i in range(len(line_ids)):
+                str_list_sql += str(line_ids[i])
+                if i < len(line_ids) - 1:
+                    str_list_sql += ','
+            str_list_sql += ')'
+            # get the collection of token embeddings
+            self.c.execute("""
+                SELECT embedding FROM {} WHERE lineidx in {} AND layer=?
+            """.format(table_name, str_list_sql), [layer])
+        result = self.c.fetchall()
+        self.conn.commit()
+        return self.unpack_fetch_all_embeddings(result)
+
+    def get_avg_ber_embed(self, dataset_name, token_name, line_ids=None, layer=-1):
+        """
+        get the average bert embedding for target token in the target dataset, constrained to appearances in certain
+        lines
+        :param dataset_name: name of the dataset
+        :param token_name: name of the token
+        :param line_ids: a list of integer or None; if list each one represents a line id; if None compute the
+        :param layer: str or int, layer for embedding; should correspond to -1 to -12 and other method of extracting
+        embeddings
+        :return: False if target table does not exists, otherwise a numpy array as the average embedding of target token
+        """
+        embeds = self.get_embeddings_on_row(dataset_name, token_name, line_ids, layer)
+        if embeds is False:
+            return False
+        return np.average(embeds, axis=0)
+
+
+    @staticmethod
+    def unpack_fetch_all_embeddings(embeds):
+        """
+        The database system will return a list of tuples as the result of select and getchall command
+        when selecting an embedding. each tuple contains one embedding, in this case, a string that was created by
+        np.array.dumps
+        This method turns the unpacked embeddings as list of numpy.array
+        :param embeds: database select result
+        :return: list of numpy.array
+        """
+        result = []
+        for embed in embeds:
+            result.append(np.loads(embed[0]))
         return result
 
     def dump_table(self, table_name):
@@ -278,7 +351,7 @@ class BERTDBProcessor:
                 if progress % 100 == 0:
                     unfinshed = file_lines - progress
                     time_used = time.time() - start
-                    estimated_finish = time_used / (progress+1) * unfinshed
+                    estimated_finish = time_used / (progress + 1) * unfinshed
                     print("Current Progress {}/{}, has already work on job for {}, estimated end in {} sec".format(
                         progress, file_lines, time_used, estimated_finish))
                 progress += 1
