@@ -83,6 +83,8 @@ class BERTEmbedManager:
         # in the validation set, we build the embedding based on the dictionary we generated in the previous step
         # if OOV is found, simply randomly choose any one of the word in the dictionary as a replacement
         dev_result = []
+        # get a list copy of collected tokens for randomly replacement of OOV
+        collected_tokens = list(embed_dict.keys())
         for i in list(df.index):
             if i not in train_line_ids:
                 sentence = self.tokenizer.tokenize(df.iloc[i]['text'])
@@ -93,7 +95,7 @@ class BERTEmbedManager:
                         sentence_embed.append(embed_dict[word])
                     except KeyError:
                         # handle OOV
-                        random_word = random.choice(embed_dict.keys())
+                        random_word = random.choice(collected_tokens)
                         sentence_embed.append(embed_dict[random_word])
                 dev_result.append(sentence_embed)
         return (embed_dict, train_result, dev_result)
