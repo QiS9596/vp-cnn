@@ -70,7 +70,7 @@ class BERTEmbedManager:
             for sentence in sup['text']:
                 sentence_embed = []
                 for word in self.tokenizer.tokenize(sentence):
-                    word = self.db_manager.rmv_punc()
+                    word = self.db_manager.rmv_punc(word)
                     try:
                         sentence_embed.append(embed_dict[word])
                     except KeyError:
