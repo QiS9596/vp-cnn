@@ -205,7 +205,7 @@ class BERTDBProcessor:
         if line_ids is None:
             self.c.execute("""
                 SELECT embedding FROM {} WHERE layer=?
-            """, [layer])
+            """.format(table_name), [layer])
         else:
             str_list_sql = '('
             for i in range(len(line_ids)):
