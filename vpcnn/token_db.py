@@ -201,7 +201,7 @@ class BERTDBProcessor:
         self.conn.commit()
         if len(self.c.fetchall()) <= 0:
             return False
-        # if line_ids is None
+        # if train_line_ids is None
         if line_ids is None:
             self.c.execute("""
                 SELECT embedding FROM {} WHERE layer=?
@@ -221,21 +221,27 @@ class BERTDBProcessor:
         self.conn.commit()
         return self.unpack_fetch_all_embeddings(result)
 
-    def get_avg_ber_embed(self, dataset_name, token_name, line_ids=None, layer=-1):
+    def get_avg_bert_embed(self, datasets_name, token_name, line_selection=None, layer=-1):
         """
-        get the average bert embedding for target token in the target dataset, constrained to appearances in certain
+        get the average bert embedding for target token across a collection of datasets, constrained to appearances in certain
         lines
-        :param dataset_name: name of the dataset
+        :param datasets_name: list of name of the datasets
         :param token_name: name of the token
-        :param line_ids: a list of integer or None; if list each one represents a line id; if None compute the
+        :param line_selection: a list contains lists of integer or None; if list each one represents a line id;
+        if None include the entire dataset.
         :param layer: str or int, layer for embedding; should correspond to -1 to -12 and other method of extracting
         embeddings
         :return: False if target table does not exists, otherwise a numpy array as the average embedding of target token
         """
-        embeds = self.get_embeddings_on_row(dataset_name, token_name, line_ids, layer)
-        if embeds is False:
-            return False
-        return np.average(embeds, axis=0)
+        embeds_ = []
+        for i in range(len(datasets_name)):
+            dataset_name = datasets_name[i]
+            line_ids = line_selection[i]
+            embeds = self.get_embeddings_on_row(dataset_name, token_name, line_ids, layer)
+            if embeds:
+                embeds_ += embeds
+
+        return np.average(embeds_, axis=0)
 
 
     @staticmethod
