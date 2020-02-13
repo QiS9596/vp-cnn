@@ -91,12 +91,20 @@ def get_10fold_acc(n_kernels=500, lr=1e-3, epochs=1000, batch_size=50, optimizer
                    pretrain_epochs=50):
     validation_sum = 0.0
     for i in range(10):
-        train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=all_tsv_path,
-                                                                           foldid=i,
-                                                                           label_filename=label_tsv_path,
-                                                                           train_npy_name=bert_data_npy,
-                                                                           label_npy_name=bert_label_npy,
-                                                                           num_experts=0)
+        if args.splitted:
+            data_path = os.path.join(args.data_dir, str(i))
+            train_tsv = os.path.join(data_path, 'train.tsv')
+            train_npy = os.path.join(data_path, 'train.npy')
+            eval_tsv = os.path.join(data_path, 'dev.tsv')
+            eval_npy = os.path.join(data_path, 'dev.npy')
+            train, dev, test = vp_dataset_bert.load_one_fold(train_tsv, train_npy, eval_tsv, eval_npy, class_num=class_num)
+        else:
+            train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=all_tsv_path,
+                                                                               foldid=i,
+                                                                               label_filename=label_tsv_path,
+                                                                               train_npy_name=bert_data_npy,
+                                                                               label_npy_name=bert_label_npy,
+                                                                               num_experts=0)
         if args.model_mode == 'cnn':
             mdl = model_bert.CNN_Embed(kernel_num=n_kernels, class_num = class_num, embed_dim=embed_dim)
             acc,model = bert_train.train_wraper(train_iter=train, dev_iter=dev, optimizer=optimizer, model=mdl, lr=lr, epochs=epochs, batch_size=batch_size)

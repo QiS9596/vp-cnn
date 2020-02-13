@@ -180,7 +180,29 @@ class VPDataset_bert_embedding(Dataset):
         :param class_num:
         :return: a tuple of three elements, containing train, development and test dataset object
         """
-        pass
+        # load label data from tsv, load word embeddings from npy file
+        train_df = pd.read_csv(train_tsv, sep='\t', header=None, names=['labels', 'embed'])
+        eval_df = pd.read_csv(eval_tsv, sep='\t', header=None, names=['labels', 'embed'])
+        train_arr = np.load(train_npy, allow_pickle=True)
+        eval_arr = np.load(eval_npy, allow_pickle=True)
+        train_df = train_df['labels'].to_frame()
+        train_df['embed'] = train_arr
+        eval_df = eval_df['labels'].to_frame()
+        eval_df['embed'] = eval_arr
+        # sequence padding
+        train_df = VPDataset_bert_embedding.sequence_padding(train_df, max_seq_len=max_seq_len)
+        eval_df = VPDataset_bert_embedding.sequence_padding(eval_df, max_seq_len=max_seq_len)
+        # get the label data outof the training set
+        train_df_ = train_df[:len(train_df.index)-class_num]
+        label_df = train_df[len(train_df.index)-class_num:]
+        dev_length = int(np.floor(dev_split * float(len(train_df_.index))))
+
+        # TODO complete selecting development set
+        dev_df = train_df[int(-1*dev_length):]
+        train_df_ = pd.concat([train_df_[:int(-1*dev_length)], label_df])
+        return (cls(df=train_df_),
+                cls(df=dev_df),
+                cls(df=eval_df))
 
 class AutoEncoderPretrainDataset(Dataset):
     """
