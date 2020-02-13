@@ -7,6 +7,7 @@ import bert_train
 import argparse
 import numpy as np
 import pandas as pd
+import os
 parser = argparse.ArgumentParser(description="Hyperparameter tunning for BERT-CNN(grid search)")
 parser.add_argument('-lr-low', type=float, default=1e-3, help='minimum value of learning rate [default:1e-3]')
 parser.add_argument('-lr-high', type=float, default=1e-2, help='maximum value of learning rate [default:1e-2]')
@@ -21,22 +22,25 @@ parser.add_argument('-nkernels-low', type=int, default=50, help='minimum number 
 parser.add_argument('-nkernels-high', type=int, default=800, help='maximum number of each type of filters [default:800]')
 parser.add_argument('-nkernels-step', type=int, default=50, help='step size of number of each type of filters [default:50]')
 parser.add_argument('-embed-method', type=str, default='avg4', help='method of extracting embedding from BERT [default:avg4]')
+parser.add_argument('-data-dir', type=str, default='data/bert_embeddings', help='path to dataset [default:data/bert_embeddings]')
+parser.add_argument('-splitted', action='store_true', default=False, help='set if to load splitted dataset for cross-validation [default:False]')
+# TODO : integrate load splitted dataset in to script
 # possible embedding method: concat4, avg4, f1
 parser.add_argument('-logdir', type=str, default='./data/result.csv', help='result dir for logging')
 args = parser.parse_args()
 # these are the things I don't want to add to the argument for now, but keep them here can making it easy to make it
 # changable without changing the grid search loop
-bert_embedding_path = 'data/bert_embeddings/all.tsv'
-bert_label_embedding_path = 'data/bert_embeddings/labels.tsv'
-bert_data_npy = 'data/bert_embeddings/all_'+args.embed_method+'.npy'
-bert_label_npy = 'data/bert_embeddings/labels_'+args.embed_method+'.npy'
+all_tsv_path = os.path.join(args.data_dir, 'all.tsv')
+label_tsv_path = os.path.join(args.data_dir, 'label.tsv')
+bert_data_npy = os.path.join(args.data_dir, 'all_'+args.embed_method+'.npy')
+bert_label_npy = os.path.join(args.data_dir, 'labels_'+args.embed_method+'.npy')
 possible_optimizers = ['adadelta']
 validation_sum = 0.0
 """-------------previous script for try and error -----------------------------------------------------"""
 # for i in range(10):
-#     train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=bert_embedding_path,
+#     train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=all_tsv_path,
 #                                                                    foldid=i,
-#                                                                    label_filename=bert_label_embedding_path,
+#                                                                    label_filename=label_tsv_path,
 #                                                                    train_npy_name=bert_data_npy,
 #                                                                    label_npy_name=bert_label_npy,
 #                                                                    num_experts=0)
@@ -51,9 +55,9 @@ validation_sum = 0.0
 def get_10fold_acc(n_kernels=500, lr=1e-3, epochs=1000, batch_size=50, optimizer='adadelta', embed_dim=768):
     validation_sum = 0.0
     for i in range(10):
-        train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=bert_embedding_path,
+        train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=all_tsv_path,
                                                                            foldid=i,
-                                                                           label_filename=bert_label_embedding_path,
+                                                                           label_filename=label_tsv_path,
                                                                            train_npy_name=bert_data_npy,
                                                                            label_npy_name=bert_label_npy,
                                                                            num_experts=0)

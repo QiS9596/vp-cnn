@@ -162,4 +162,22 @@ class VPDataset_bert_embedding(Dataset):
                                            df_label])
                 trains.append(cls(df=train_current))
             return (trains, devs, test_)
+    @classmethod
+    def load_one_fold(cls, train_tsv, train_npy, eval_tsv, eval_npy, dev_split=0.1, max_seq_len=32, class_num=334):
+        """
+        If we have already split the dataset into folds, we can then load these splitted dataset using this method
 
+        There is one pitfall we made during generating dataset, that we directly merge the label file (context for each
+        class, we use it for support training to make sure each class has at least one sample). Here, to make sure the
+        development set with dev_split=0.1 obtained by splitting the training set, does not contain examples of this
+        label set, we only get dev_split on the first (len(train_tsv)-class_num) examples.
+        :param train_tsv:
+        :param train_npy:
+        :param eval_tsv:
+        :param eval_npy:
+        :param dev_split:
+        :param max_seq_len:
+        :param class_num:
+        :return: a tuple of three elements, containing train, development and test dataset object
+        """
+        train_df.
