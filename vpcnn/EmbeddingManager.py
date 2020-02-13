@@ -80,6 +80,7 @@ class BERTEmbedManager:
                                                                        layer=layer)
                         sentence_embed.append(avg_embed)
                         embed_dict[word] = avg_embed
+                train_result.append(sentence_embed)
         # in the validation set, we build the embedding based on the dictionary we generated in the previous step
         # if OOV is found, simply randomly choose any one of the word in the dictionary as a replacement
         dev_result = []

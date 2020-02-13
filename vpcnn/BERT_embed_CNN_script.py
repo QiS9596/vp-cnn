@@ -97,7 +97,7 @@ def get_10fold_acc(n_kernels=500, lr=1e-3, epochs=1000, batch_size=50, optimizer
             train_npy = os.path.join(data_path, 'train.npy')
             eval_tsv = os.path.join(data_path, 'dev.tsv')
             eval_npy = os.path.join(data_path, 'dev.npy')
-            train, dev, test = vp_dataset_bert.load_one_fold(train_tsv, train_npy, eval_tsv, eval_npy, class_num=class_num)
+            train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.load_one_fold(train_tsv, train_npy, eval_tsv, eval_npy, class_num=class_num)
         else:
             train, dev, test = vp_dataset_bert.VPDataset_bert_embedding.splits(filename=all_tsv_path,
                                                                                foldid=i,
