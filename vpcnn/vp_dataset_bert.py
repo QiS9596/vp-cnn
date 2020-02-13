@@ -1,7 +1,8 @@
-from torch.utils.data import Dataset
-import pandas as pd
 import os
+
 import numpy as np
+import pandas as pd
+from torch.utils.data import Dataset
 
 
 class VPDataset_bert_embedding(Dataset):
@@ -20,11 +21,11 @@ class VPDataset_bert_embedding(Dataset):
             label_dum = pd.get_dummies(self.df['labels']).values
             dum_in_list = []
             for i in range(label_dum.shape[0]):
-                dum_in_list.append(label_dum[i,:])
+                dum_in_list.append(label_dum[i, :])
             self.df['labels'] = dum_in_list
 
     def __getitem__(self, index):
-        return {'label':self.df.iloc[index]['labels'], 'embed':self.df.iloc[index]['embed']}
+        return {'label': self.df.iloc[index]['labels'], 'embed': self.df.iloc[index]['embed']}
 
     def __len__(self):
         return len(list(self.df.index))
@@ -39,7 +40,7 @@ class VPDataset_bert_embedding(Dataset):
         :param npy_path: str: path to the wordembedding np.array
         :return: Pandas.DataFrame object
         """
-        df_ = pd.read_csv(tsv_path, sep='\t', header=None, names=['label','text'])
+        df_ = pd.read_csv(tsv_path, sep='\t', header=None, names=['label', 'text'])
         matrix = np.load(npy_path, allow_pickle=True)
         assert len(list(df_.index)) == matrix.shape[0]
         df_.drop(['text'], axis=1)
@@ -67,19 +68,18 @@ class VPDataset_bert_embedding(Dataset):
                 continue
             # if the current row has longer sequence, then cut
             elif current_row_len > max_seq_len:
-                df['embed'][row_idx] = df['embed'][row_idx][:max_seq_len,:]
+                df['embed'][row_idx] = df['embed'][row_idx][:max_seq_len, :]
             # if the current row has shorter sequence, then pad
             else:
                 df['embed'][row_idx] = np.pad(df['embed'][row_idx],
-                                              ((0,max_seq_len-current_row_len),(0,0)),
+                                              ((0, max_seq_len - current_row_len), (0, 0)),
                                               'constant',
                                               constant_values=[0])
         return df
 
-
     @classmethod
-    def splits(cls, num_fold=10, foldid=0, root='.', filename=None, label_filename=None,train_npy_name=None,
-               label_npy_name=None, num_experts=5,dev_split=0.1, max_seq_len=32):
+    def splits(cls, num_fold=10, foldid=0, root='.', filename=None, label_filename=None, train_npy_name=None,
+               label_npy_name=None, num_experts=5, dev_split=0.1, max_seq_len=32):
         """
         This method splits the dataset into two parts: the training data and the testing data. We would not use
         development set to monitor the performance on unseen data during the training.
@@ -116,7 +116,7 @@ class VPDataset_bert_embedding(Dataset):
         label_path = os.path.join(root, label_filename)
         data_npy_path = os.path.join(root, train_npy_name)
         label_npy_path = os.path.join(root, label_npy_name)
-        df = pd.read_csv(data_path, sep='\t',header=None, names=['labels', 'embed'])
+        df = pd.read_csv(data_path, sep='\t', header=None, names=['labels', 'embed'])
         df_label = pd.read_csv(label_path, sep='\t', header=None, names=['labels', 'embed'])
 
         npy_data = np.load(data_npy_path, allow_pickle=True)
@@ -125,10 +125,10 @@ class VPDataset_bert_embedding(Dataset):
         df['embed'] = npy_data
         df_label = df_label['labels'].to_frame()
         df_label['embed'] = npy_label
-        df = VPDataset_bert_embedding.sequence_padding(df,max_seq_len=max_seq_len)
-        df_label = VPDataset_bert_embedding.sequence_padding(df_label,max_seq_len=max_seq_len)
+        df = VPDataset_bert_embedding.sequence_padding(df, max_seq_len=max_seq_len)
+        df_label = VPDataset_bert_embedding.sequence_padding(df_label, max_seq_len=max_seq_len)
         # We split the data into k splits
-        fold_dfs = np.array_split(ary=df,indices_or_sections=num_fold)
+        fold_dfs = np.array_split(ary=df, indices_or_sections=num_fold)
         # claim test fold
         test_ = cls(df=fold_dfs[foldid])
         # then concat the rest fold as train-dev data
@@ -140,13 +140,13 @@ class VPDataset_bert_embedding(Dataset):
 
             # we substract last several element correspond to the dev_split parameter and set them as development set
 
-            dev_df = df_train_dev[int(-1*dev_length):]
+            dev_df = df_train_dev[int(-1 * dev_length):]
             # the other training examples plus the label set are served as training set
-            train_df = pd.concat([df_train_dev[:int(-1*dev_length)], df_label])
+            train_df = pd.concat([df_train_dev[:int(-1 * dev_length)], df_label])
             return (
-                    cls(df=train_df),
-                    cls(df=dev_df),
-                    test_)
+                cls(df=train_df),
+                cls(df=dev_df),
+                test_)
         else:
             # assert that each stack of CNN contains at most 5 agents
             assert num_experts <= 5
@@ -156,9 +156,9 @@ class VPDataset_bert_embedding(Dataset):
             # then for each expert, it will gets a dev set and a training set, the length of dev sets are all dev_length
             # but the dev set and training set for each expert are different to make sure they are divergent
             for i in range(num_experts):
-                devs.append(cls(df=df_train_dev[int(dev_length*i):int(dev_length*(i+1))]))
-                train_current = pd.concat([df_train_dev[:int(dev_length*i)],
-                                           df_train_dev[int(dev_length*(i+1)):],
+                devs.append(cls(df=df_train_dev[int(dev_length * i):int(dev_length * (i + 1))]))
+                train_current = pd.concat([df_train_dev[:int(dev_length * i)],
+                                           df_train_dev[int(dev_length * (i + 1)):],
                                            df_label])
                 trains.append(cls(df=train_current))
             return (trains, devs, test_)
@@ -180,4 +180,48 @@ class VPDataset_bert_embedding(Dataset):
         :param class_num:
         :return: a tuple of three elements, containing train, development and test dataset object
         """
-        train_df.
+        pass
+
+class AutoEncoderPretrainDataset(Dataset):
+    """
+    This object works as a Dataset object for pretraining an auto-encoder-decoder mentioned in model_bert.py:
+    BaseAutoEncoderDecoder
+    """
+
+    def __init__(self, df):
+        self.df = df
+
+    def __getitem__(self, index):
+        return {'embed': self.df.iloc[index]['embed']}
+
+    def __len__(self):
+        return len(list(self.df.index))
+
+    @classmethod
+    def from_VPDataset_bert_embedding(cls, vpdataset, embed_dim=768):
+        """
+        Takes a VPDataset_bert_embedding, and collapse the sequences of word embeddings into a collection of word
+        embeddings, then emcapsulate with AutoEncoderPretrainDataset
+        :param vpdataset: an object of VPDataset_bert_embedding
+        :return: an object of AutoEncoderPretrainDataset
+        """
+        sequence_level_df = vpdataset.df
+        embeddings = sequence_level_df['embed']  # Pandas.Series that contains the embeddings
+        # we'll use a loop to traverse the dataframe to collapse the sentence structure
+        # which might not be a best implementation
+        word_embeddings = []
+        #for index in list(embeddings.index):
+            # for each sentence we destroy the sentence structure and extends to the sequence of just embedding
+
+        #    word_embeddings += embeddings.get(index).tolist()
+        embeddings = embeddings.to_list()
+        for sentence in embeddings:
+            #word_embeddings += sentence.reshape(-1, embed_dim)
+            word_embeddings += np.split(sentence, sentence.shape[0],1)
+        #def to_ndarray(list):
+        #    return np.array(list)
+        word_embeddings_df = pd.DataFrame()
+        word_embeddings_df['embed'] = word_embeddings
+        print(word_embeddings_df.to_numpy().shape)
+        #word_embeddings_df['embed'] = word_embeddings_df['embed'].apply(to_ndarray)
+        return cls(word_embeddings_df)

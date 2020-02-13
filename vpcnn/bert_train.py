@@ -1,14 +1,17 @@
 """
 The model provides training and evaluation method similar to train.py but compatible with bert cnn models
+for CNN_shirnk_dim training method is attached as class static method
 """
-import os
-import sys
+import copy
+
+import model_bert
 import torch
 import torch.autograd as autograd
 import torch.nn.functional as F
-import copy
-import numpy as np
+import vp_dataset_bert
 from torch.utils.data import DataLoader
+
+
 def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device='cuda'):
     """
     generator function wraps pytorch dataloader
@@ -25,17 +28,14 @@ def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device
     for data_dict in dataloader:
         out_data_dict = {}
         for name, tensor in data_dict.items():
-            if name=='embed__':
-                print("type of a batch")
-                print(type(data_dict[name]))
-                print("type of an dataobject")
-                print(type(data_dict[name][0]))
+            if name == 'embed__':
                 out_data_dict[name] = torch.FloatTensor(data_dict[name])
             else:
                 out_data_dict[name] = data_dict[name]
             # if device == 'cuda':
-                # out_data_dict[name] = data_dict[name].to('cuda')
+            # out_data_dict[name] = data_dict[name].to('cuda')
         yield out_data_dict
+
 
 def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, epochs=25, batch_size=50,
           max_norm=3.0, no_always_norm=False):
@@ -61,7 +61,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
     if optimizer == 'adam':
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=l2)
     elif optimizer == 'sgd':
-        optimizer = torch.optim.SGD(model.parameters, lr=lr, weight_decay=l2)
+        optimizer = torch.optim.SGD(model.parameters(), lr=lr, weight_decay=l2)
     elif optimizer == 'adadelta':
         optimizer = torch.optim.Adadelta(model.parameters(), rho=0.95)
     steps = 0
@@ -69,18 +69,19 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
     best_acc = 0
     best_model = None
     # train_batchs is a sqeuence of python dicts obtained based on the given dataset
-    train_batchs_ = generate_batches(dataset=train, batch_size=batch_size, shuffle=False, drop_last=False,device=device)
+    train_batchs_ = generate_batches(dataset=train, batch_size=batch_size, shuffle=False, drop_last=False,
+                                     device=device)
     train_batchs = []
     for batch in train_batchs_:
         train_batchs.append(copy.deepcopy(batch))
     # begin training
-    for epoch in range(1, epochs+1):
+    for epoch in range(1, epochs + 1):
         # fit model on batch
         batch_idx = 0
         for batch in train_batchs:
             feature = batch['embed']
             target = batch['label']
-            before = copy.deepcopy(list(model.parameters())[0])
+
             # step 1: set optimizer to zero grad
             optimizer.zero_grad()
             # step 2: make prediction
@@ -92,24 +93,73 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             loss.backward()
             # step 5: update weights
             optimizer.step()
-            after = copy.deepcopy(list(model.parameters())[0])
-            #print(torch.equal(before.data, after.data))
+
+            # print(torch.equal(before.data, after.data))
             batch_idx += 1
             # max norm constraint
             # Qi: the code is directly copy paste from original one, dont completely sure the process
             if max_norm > 0:
                 if not no_always_norm:
                     for row in model.fc1.weight.data:
-                        norm = row.norm() +1e-7
+                        norm = row.norm() + 1e-7
                         row.div_(norm).mul_(max_norm)
                 else:
-                    model.fc1.weight.data.renorm_(2,0,max_norm)
+                    model.fc1.weight.data.renorm_(2, 0, max_norm)
         acc = eval(dev, model, batch_size, use_cuda)
         if acc > best_acc:
             best_model = copy.deepcopy(model)
     model = best_model
     acc = eval(dev, model, batch_size, use_cuda)
     return acc, model
+
+
+def train_wraper(train_iter, dev_iter, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, epochs=25,
+                 batch_size=50,
+                 max_norm=3.0, no_always_norm=False, pretrain_optimizer='adadelta', pretrain_lr=1e-4,
+                 pretrain_batch_size=50, pretrain_early_stop_loss=1e-2, pretrain_epochs=50, mode='plain_cnn'):
+    """
+    A wrapper of train function for different models
+    Current training mode
+    'plain_cnn': refers to the train function above and model_bert.CNN_Embed model
+    'cnn_shirnk_dim': refers to model_bert.CNN_shirnk_dim and its corresponded training method
+    'auto_encoder_decoder': refers to just train auto-encoder-decoder
+    :param train: training dataset object
+    :param dev: development dataset object
+    :param model: model object to be trained
+    :param optimizer: str; for choosing optimizer
+    :param use_cuda: bool; for using cuda or not
+    :param lr: float; learning rate
+    :param l2: l2 regularization of optimizer
+    :param epochs: int; max number of epochs
+    :param batch_size: int; batch size
+    :param max_norm: float, l2 constraint for parameters
+    :param no_always_norm: boolean; if true then do some black magic to norm of output layer
+    **pretrain parameters is not used if mode is plain_cnn**
+    **training autoencoder only will use pretrain parameter**
+    :param pretrain_optimizer: optimizer for pretraining auto-encoder-decoder
+    :param pretrain_lr: learning rate for pretraining auto-encoder-decoder
+    :param pretrain_batch_size: batch size for pretraining auto-encoder-decoder
+    :param pretrain_early_stop_loss: early stop loss value for pretraining auto-encoder-decoder, loss refers to mse
+    :param pretrain_epochs: max training epochs for pretraining auto-encoder-decoder
+    :param mode: str; different training mode refers to training function of different models
+    :return: tuple of acc and copy of best model
+    """
+    print(mode)
+    if mode == 'plain_cnn':
+        return train(train=train_iter, dev=dev_iter, model=model, optimizer=optimizer, use_cuda=use_cuda, lr=lr, l2=l2,
+                     epochs=epochs, batch_size=batch_size, max_norm=max_norm, no_always_norm=no_always_norm)
+    if mode == 'cnn_shirnk_dim':
+        # TODO
+        pass
+    if mode == 'auto_encoder_decoder':
+        collapsed_train = vp_dataset_bert.AutoEncoderPretrainDataset.from_VPDataset_bert_embedding(train_iter)
+        print(type(collapsed_train))
+        print(collapsed_train.df['embed'][0])
+        return model_bert.AutoEncoderDecoder.pre_train(model, collapsed_train, optimizer=pretrain_optimizer,
+                                                       lr=pretrain_lr,
+                                                       batch_size=pretrain_batch_size,
+                                                       early_stop_loss=pretrain_early_stop_loss,
+                                                       use_cuda=use_cuda, epochs=pretrain_epochs)
 
 
 def eval(data_iter, model, batch_size, use_cuda=True):
@@ -139,13 +189,36 @@ def eval(data_iter, model, batch_size, use_cuda=True):
         corrects += (torch.max(logit, 1)
                      [1].view(target.size()).data == target.data).sum()
     avg_loss /= len(data_iter)
-    accuracy = corrects/len(data_iter) * 100.0
+    accuracy = corrects / len(data_iter) * 100.0
     model.train()
     print('\nEvaluation - loss: {:.6f}  acc: {:.4f}%({}/{})'.format(avg_loss,
-                                                                       accuracy,
-                                                                       corrects,
-                                                                       len(data_iter)))
+                                                                    accuracy,
+                                                                    corrects,
+                                                                    len(data_iter)))
     return accuracy
+
+
+def eval_wraper(data_iter, model, batch_size, use_cuda=True, mode='classifier'):
+    """
+    A wrapper of training different models
+    Current training mode
+    'classifier', 'plain_cnn', 'cnn_shirnk_dim': refers to the sentence classifiers
+    'auto_encoder_decoder': refers to the auto-encoder-decoder reconstruction loss.
+    :param data_iter: vp_dataset_bert.VPDataset_bert_embedding; evaluation (development/test dataset)
+    :param model: model to be trained, should be in model_bert
+    :param batch_size: int; size of each batch
+    :param use_cuda: boolean; if to use cuda
+    :param mode: str: use to configure evalution method; for classifier or auto-encoder
+    :return: accuracy or mse loss, depends on the more
+    """
+    classifier_modes = ['classifier', 'plain_cnn', 'cnn_shirnk_dim']
+    if mode in classifier_modes:
+        return eval(data_iter=data_iter, model=model, batch_size=batch_size, use_cuda=use_cuda)
+    elif mode == 'auto_encoder_decoder':
+        data_iter_ = vp_dataset_bert.AutoEncoderPretrainDataset.from_VPDataset_bert_embedding(data_iter)
+        return model_bert.AutoEncoderDecoder.eval_mdl(data_iter=data_iter_, model=model, batch_size=batch_size,
+                                                      use_cuda=use_cuda)
+
 
 def ensemble_predict(batch_feature, batch_target, models):
     """
