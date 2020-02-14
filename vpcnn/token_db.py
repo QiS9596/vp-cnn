@@ -155,6 +155,32 @@ class BERTDBProcessor:
         self.conn.commit()
         return True
 
+    def get_embeddings_onLayer(self, dataset_name, token_name, layer):
+        """
+        Get bert embedding of a certain token in target dataset that are only on certain layer
+        :param dataset_name: name of the dataset
+        :param token_name: name of the token
+        :param layer: layer indicator, str or int
+        :return: False or list of np.array
+        """
+        table_name = dataset_name + '_' + token_name
+        # check if the target table exists
+        self.c.execute("""
+            SELECT * FROM sqlite_master WHERE type='table' AND name=?
+        """, [table_name])
+        self.conn.commit()
+        if len(self.c.fetchall()) <= 0:
+            return False
+        # get the collection of token embeddings
+        if not isinstance(layer, str):
+            layer=str(layer)
+        self.c.execute("""
+            SELECT (embedding, lineidx, positionidx) FROM {} WHERE layer=?
+        """.format(table_name), [layer])
+        result = self.c.fetchall()
+        self.conn.commmit()
+        return result
+
     def get_embeddings(self, dataset_name, token_name):
         """
         Get a collection of word embedding for all appearances of target token in the correspond dataset
