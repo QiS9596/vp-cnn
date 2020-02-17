@@ -1,16 +1,19 @@
 import copy
 import random
 import time
+import os
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import pandas as pd
+import sklearn.decomposition as decomp
 from sklearn import cluster
 from sklearn import preprocessing
 from sklearn.metrics import silhouette_samples
 from sklearn.metrics import silhouette_score
-
+Axes3D
 import token_db
 import tokenization
 
@@ -110,9 +113,10 @@ class BERTEmbedManager:
                 dev_result.append(sentence_embed)
         return (embed_dict, train_result, dev_result)
 
-    def silhouetteplot(self, data, cluster_label, n_clusters):
+    def silhouetteplot(self, data, cluster_label, n_clusters, scatter_loc, show=True, output=None):
         fig = plt.figure()
-        ax = fig.add_subplot(1, 1, 1)
+        ax = fig.add_subplot(1, 2, 1)
+        ax_ = fig.add_subplot(1, 2, 2, projection='3d')
         ax.set_xlim([-1.0, 1.0])
         vertical_spacing = (n_clusters + 1) * 50
         ax.set_ylim([-100, len(data) + vertical_spacing])
@@ -143,37 +147,85 @@ class BERTEmbedManager:
         ax.axvline(x=average, color='red', linestyle='--')
         ax.set_yticks([])
         ax.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
-        plt.show()
 
-    def clustering_analysis_BERT_token(self, dataset_name, token_name, layer, n_clusters_range=[2, 15, 2],
-                                       plot_fig=False):
+        color_map = cm.get_cmap('nipy_spectral')
+        colors = color_map(cluster_label.astype(float) / n_clusters)
+        ax_.scatter(scatter_loc[:, 0], scatter_loc[:, 1], scatter_loc[:, 2], marker='.', s=30, lw=0, alpha=0.7,
+                    c=colors, edgecolor='k')
+        ax_.set_title('Reduced dimension data')
+        if output:
+            plt.savefig(output)
+        if show:
+            plt.show()
+
+
+    def clustering_analysis_BERT_token_kmeans(self, dataset_name, token_name, layer, n_clusters_range=[2, 15, 2],
+                                              trials=30, plot_fig=False, dimen_reduction_method=None,
+                                              visualize_reduction_method='auto', output=None):
+        """
+        This method apply k-mean cluster algorithm to a certain collection of bert embedding of target token to study
+        it's behavior.
+        If the dimen_rduction_method is None, then the clustering algorithm will not be applied before the clustering.
+        The visualization_reduction_method is the dimensionality reduction method that is applied for better
+        visualization the dataset. if 'auto' is selected, we will use pca when dien_reduction_method is None, or used
+        the same method for dimen_reduction_method.
+        :param dataset_name: str; name of the dataset
+        :param token_name: str; token
+        :param layer: str or int; refers to the target BERT layer for embedding extraction
+        :param n_clusters_range: list of integers, used for search the best cluster number of k-means cluster, follow
+        the pattern of [start, end, step] as the range function of python
+        :param plot_fig: bool, if to use silhouette plot to plot figure
+        :param dimen_reduction_method: method for dimensionality reduction
+        :param visualize_reduction_method: dimensionality reduction for visualization purpose
+        :param output: str; path for output; if it's None, do not output; otherwise output the figure into target path
+        :return:
+        """
         # collect the embeddings
         token_records = self.db_manager.get_embeddings_onLayer(dataset_name, token_name, layer)
         token_embeddings = []
         for token_record in token_records:
             token_embeddings.append(np.loads(token_record[0]))
+        print(np.array(token_embeddings).shape)
         best_silhouette_score = -1.1
         best_clustering = None
         best_n_clusters = None
+        n_clusters_eval = []
         for n_clusters in range(n_clusters_range[0], n_clusters_range[1], n_clusters_range[2]):
-            clustering = self.KMeans_clustering_bert_token(token_embeddings, n_clusters)
+            clustering = self.KMeans_clustering_bert_token(token_embeddings, n_clusters, trials=trials)
             average_silhouette_score = silhouette_score(token_embeddings, clustering.labels_)
+            n_clusters_eval.append((n_clusters, average_silhouette_score))
             if average_silhouette_score > best_silhouette_score:
                 best_silhouette_score = average_silhouette_score
                 best_clustering = copy.deepcopy(clustering)
                 best_n_clusters = n_clusters
-        if plot_fig:
-            self.silhouetteplot(token_embeddings, best_clustering.labels_, best_n_clusters)
-        return best_n_clusters, best_clustering, best_silhouette_score
+        if plot_fig or output:
+            if visualize_reduction_method == 'auto' and dimen_reduction_method is None:
+                reduced = decomp.PCA(n_components=3).fit_transform(token_embeddings)
+            if output == None:
+                output = None
+            else:
+                name = dataset_name+'_'+token_name+'_' + str(layer) + '_n-clusters'+ str(best_n_clusters)
+                if dimen_reduction_method is not None:
+                    name += '_dimen-reduction' + dimen_reduction_method
+                if visualize_reduction_method == 'auto' and dimen_reduction_method is None:
+                    name += '_visual-reductionPCA'
+                name += '.png'
+                output = os.path.join(output, name)
+            self.silhouetteplot(token_embeddings, best_clustering.labels_, best_n_clusters, reduced, show=plot_fig,
+                                output=output)
+        return best_n_clusters, best_clustering, best_silhouette_score, n_clusters_eval
 
-    def KMeans_clustering_bert_token(self, token_embeddings, n_clusters):
+    def KMeans_clustering_bert_token(self, token_embeddings, n_clusters, trials=30, normalize=True):
         """
         This function takes a list of token embeddings, apply normalization on it and then apply kmeans clustering with
         some specific number of clusters on it.
         :param token_embeddings: list of np.ndarray, or a 2d np.ndarray. each row is an bert embedding
         :param n_clusters: number of clusters
-        :return: 
+        :param trials: int, number of times for k-means to run on different random initialized centroids.
+        :param normalize: bool; if to normalize the token embedding before clustering
+        :return: the clustering
         """
-        embeddings = preprocessing.normalize(token_embeddings)
-        clustering = cluster.KMeans(n_clusters=n_clusters, n_init=30, max_iter=500).fit(embeddings)
+        if normalize:
+            embeddings = preprocessing.normalize(token_embeddings)
+        clustering = cluster.KMeans(n_clusters=n_clusters, n_init=trials, max_iter=500).fit(embeddings)
         return clustering
