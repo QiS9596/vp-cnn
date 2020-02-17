@@ -24,7 +24,6 @@ def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device
     :return: a generator which generates a sequence of batch dictionary
     """
     dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last)
-
     for data_dict in dataloader:
         out_data_dict = {}
         for name, tensor in data_dict.items():
