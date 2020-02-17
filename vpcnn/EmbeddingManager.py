@@ -113,7 +113,7 @@ class BERTEmbedManager:
                 dev_result.append(sentence_embed)
         return (embed_dict, train_result, dev_result)
 
-    def silhouetteplot(self, data, cluster_label, n_clusters, scatter_loc, show=True, output=None):
+    def silhouetteplot(self, data, cluster_label, n_clusters, scatter_loc, title='', show=True, output=None):
         fig = plt.figure()
         ax = fig.add_subplot(1, 2, 1)
         ax_ = fig.add_subplot(1, 2, 2, projection='3d')
@@ -153,15 +153,26 @@ class BERTEmbedManager:
         ax_.scatter(scatter_loc[:, 0], scatter_loc[:, 1], scatter_loc[:, 2], marker='.', s=30, lw=0, alpha=0.7,
                     c=colors, edgecolor='k')
         ax_.set_title('Reduced dimension data')
+        plt.suptitle(title)
         if output:
             plt.savefig(output)
         if show:
             plt.show()
 
+    def line_plot_silhouette(self, n_cluster_eval, title='', show=True, output=None):
+        """"""
+        x = [n[0] for n in n_cluster_eval]
+        y = [n[1] for n in n_cluster_eval]
+        plt.plot(x, y)
+        plt.title(title)
+        if output:
+            plt.savefig(output)
+        if show:
+            plt.show()
 
     def clustering_analysis_BERT_token_kmeans(self, dataset_name, token_name, layer, n_clusters_range=[2, 15, 2],
                                               trials=30, plot_fig=False, dimen_reduction_method=None,
-                                              visualize_reduction_method='auto', output=None):
+                                              visualize_reduction_method='auto', output=None, possible_clusters='auto'):
         """
         This method apply k-mean cluster algorithm to a certain collection of bert embedding of target token to study
         it's behavior.
@@ -169,6 +180,12 @@ class BERTEmbedManager:
         The visualization_reduction_method is the dimensionality reduction method that is applied for better
         visualization the dataset. if 'auto' is selected, we will use pca when dien_reduction_method is None, or used
         the same method for dimen_reduction_method.
+        The method will return necessary information, including the best number of clusters, the best clustering object,
+        the best silhouette score, and the silhouette for best trials of each n-cluster clusterings.
+        The method can also be used to plot the silhouette plot for the cluster combined with the scatter of the
+        embeddings after dimensional reduction. Plus, to study the posibility of different clustering of the embeddings,
+        a line plot of silhouette score of different n-clusers.
+
         :param dataset_name: str; name of the dataset
         :param token_name: str; token
         :param layer: str or int; refers to the target BERT layer for embedding extraction
@@ -178,6 +195,7 @@ class BERTEmbedManager:
         :param dimen_reduction_method: method for dimensionality reduction
         :param visualize_reduction_method: dimensionality reduction for visualization purpose
         :param output: str; path for output; if it's None, do not output; otherwise output the figure into target path
+        :param possible_clusters: str; if to plot the silhouette score for each
         :return:
         """
         # collect the embeddings
@@ -199,20 +217,33 @@ class BERTEmbedManager:
                 best_clustering = copy.deepcopy(clustering)
                 best_n_clusters = n_clusters
         if plot_fig or output:
+            title = 'Kmeans clustering on ' + dataset_name + ' ' + token_name
             if visualize_reduction_method == 'auto' and dimen_reduction_method is None:
                 reduced = decomp.PCA(n_components=3).fit_transform(token_embeddings)
             if output == None:
                 output = None
+                if dimen_reduction_method is not None:
+                    title += ' with dimensional reduction method '+ dimen_reduction_method
+                if possible_clusters == 'auto':
+                    title_n_clusters = title + ' n-clusters silhouette'
+                    output_n_clusters = None
             else:
-                name = dataset_name+'_'+token_name+'_' + str(layer) + '_n-clusters'+ str(best_n_clusters)
+                name = dataset_name+'_'+token_name+'_' + str(layer) + '_kmeans_n-clusters'+ str(best_n_clusters)
                 if dimen_reduction_method is not None:
                     name += '_dimen-reduction' + dimen_reduction_method
+                    title += ' with dimensional reduction method '+ dimen_reduction_method
+                if possible_clusters == 'auto':
+                    title_n_clusters = title + ' n-clusters silhouette'
+                    name_n_clusters = name +'_n_clusters_silhouette.png'
                 if visualize_reduction_method == 'auto' and dimen_reduction_method is None:
                     name += '_visual-reductionPCA'
                 name += '.png'
+                output_n_clusters = os.path.join(output, name_n_clusters)
                 output = os.path.join(output, name)
-            self.silhouetteplot(token_embeddings, best_clustering.labels_, best_n_clusters, reduced, show=plot_fig,
-                                output=output)
+            self.silhouetteplot(token_embeddings, best_clustering.labels_, best_n_clusters, reduced, title=title,
+                                show=plot_fig, output=output)
+            if possible_clusters == 'auto':
+                self.line_plot_silhouette(n_clusters_eval, title=title, show=plot_fig, output=output_n_clusters)
         return best_n_clusters, best_clustering, best_silhouette_score, n_clusters_eval
 
     def KMeans_clustering_bert_token(self, token_embeddings, n_clusters, trials=30, normalize=True):
