@@ -1,16 +1,18 @@
-import token_db
-import numpy as np
-import pandas as pd
-import tokenization
+import copy
 import random
 import time
-from sklearn import cluster
-from sklearn import preprocessing
-from sklearn.metrics import silhouette_score
-from sklearn.metrics import silhouette_samples
+
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-import copy
+import numpy as np
+import pandas as pd
+from sklearn import cluster
+from sklearn import preprocessing
+from sklearn.metrics import silhouette_samples
+from sklearn.metrics import silhouette_score
+
+import token_db
+import tokenization
 
 
 class BERTEmbedManager:
@@ -110,45 +112,46 @@ class BERTEmbedManager:
 
     def silhouetteplot(self, data, cluster_label, n_clusters):
         fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
+        ax = fig.add_subplot(1, 1, 1)
         ax.set_xlim([-1.0, 1.0])
-        vertical_spacing = (n_clusters+1) * 10
+        vertical_spacing = (n_clusters + 1) * 50
+        ax.set_ylim([-100, len(data) + vertical_spacing])
         average = silhouette_score(data, cluster_label)
         sample_silhouette_values = silhouette_samples(data, cluster_label)
 
         y_lower = 10
 
         for i in range(n_clusters):
-            ith_cluster_silhouette_values = sample_silhouette_values[cluster_label==i]
+            ith_cluster_silhouette_values = sample_silhouette_values[cluster_label == i]
             ith_cluster_silhouette_values.sort()
 
             size_cluster_i = ith_cluster_silhouette_values.shape[0]
             y_upper = y_lower + size_cluster_i
             color_map = cm.get_cmap('nipy_spectral')
-            color = color_map(float(i)/n_clusters)
+            color = color_map(float(i) / n_clusters)
             ax.fill_betweenx(np.arange(y_lower, y_upper),
                              0,
                              ith_cluster_silhouette_values,
                              facecolor=color,
                              edgecolor=color,
                              alpha=0.7)
-            ax.text(-0.05, y_lower+0.5*size_cluster_i, str(i))
-            y_lower = y_upper +10
+            ax.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
+            y_lower = y_upper + 10
         ax.set_title('Silhouette Plot')
         ax.set_xlabel('Silhouette Score')
         ax.set_ylabel('Cluster Label')
-        ax.axvline(x=average, color='red', linesytle='--')
+        ax.axvline(x=average, color='red', linestyle='--')
         ax.set_yticks([])
-        ax.set_xticks([-0.1,0,0.2,0.4,0.6,0.8,1])
+        ax.set_xticks([-0.1, 0, 0.2, 0.4, 0.6, 0.8, 1])
         plt.show()
 
-
-    def clustering_analysis_BERT_token(self, dataset_name, token_name, layer, n_clusters_range=[2,15,2], plot_fig=False):
+    def clustering_analysis_BERT_token(self, dataset_name, token_name, layer, n_clusters_range=[2, 15, 2],
+                                       plot_fig=False):
         # collect the embeddings
         token_records = self.db_manager.get_embeddings_onLayer(dataset_name, token_name, layer)
         token_embeddings = []
         for token_record in token_records:
-            token_embeddings.append(token_record[0])
+            token_embeddings.append(np.loads(token_record[0]))
         best_silhouette_score = -1.1
         best_clustering = None
         best_n_clusters = None
@@ -161,7 +164,7 @@ class BERTEmbedManager:
                 best_n_clusters = n_clusters
         if plot_fig:
             self.silhouetteplot(token_embeddings, best_clustering.labels_, best_n_clusters)
-
+        return best_n_clusters, best_clustering, best_silhouette_score
 
     def KMeans_clustering_bert_token(self, token_embeddings, n_clusters):
         """

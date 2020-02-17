@@ -175,10 +175,10 @@ class BERTDBProcessor:
         if not isinstance(layer, str):
             layer=str(layer)
         self.c.execute("""
-            SELECT (embedding, lineidx, positionidx) FROM {} WHERE layer=?
+            SELECT embedding, lineidx, positionidx FROM {} WHERE layer=?
         """.format(table_name), [layer])
         result = self.c.fetchall()
-        self.conn.commmit()
+        self.conn.commit()
         return result
 
     def get_embeddings(self, dataset_name, token_name):
