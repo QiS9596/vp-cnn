@@ -32,6 +32,31 @@ class BERTEmbedManager:
     def __init__(self, db_file='./data/bert_embed.db', bert_vocab='./data/bert_embeddings/vocab.txt'):
         self.db_manager = token_db.BERTDBProcessor(db_file)
         self.tokenizer = tokenization.FullTokenizer(bert_vocab)
+        self.dfs = {}
+
+    def load_nl_df(self, path, dataset_name, sep='\t', header=None, names=['label', 'text']):
+        """
+        load target dataframe into memory, store it into self.dfs
+        :param path:
+        :param dataset_name:
+        :param sep:
+        :param header:
+        :param names:
+        :return:
+        """
+        df = pd.read_csv(path, sep=sep, header=header, names=names)
+        self.dfs[dataset_name] = df
+
+    def clean_df(self, dataset_name):
+        """
+        Delete target df in self.dfs to free up memory
+        :param dataset_name: name of the dataset
+        :return:
+        """
+        try:
+            self.dfs.pop(dataset_name)
+        except KeyError:
+            return
 
     def embed_average_bert(self, tsv_file, train_line_ids, layer, dataset_name, supplimentary_tarining_set=None,
                            sup_df=None):
@@ -244,7 +269,7 @@ class BERTEmbedManager:
                                 show=plot_fig, output=output)
             if possible_clusters == 'auto':
                 self.line_plot_silhouette(n_clusters_eval, title=title, show=plot_fig, output=output_n_clusters)
-        return best_n_clusters, best_clustering, best_silhouette_score, n_clusters_eval
+        return best_n_clusters, best_clustering, best_silhouette_score, n_clusters_eval, token_records
 
     def KMeans_clustering_bert_token(self, token_embeddings, n_clusters, trials=30, normalize=True):
         """
@@ -260,3 +285,31 @@ class BERTEmbedManager:
             embeddings = preprocessing.normalize(token_embeddings)
         clustering = cluster.KMeans(n_clusters=n_clusters, n_init=trials, max_iter=500).fit(embeddings)
         return clustering
+
+    def on_cluster_statistics(self, cluster_labels, embeds, dataset=None):
+        """
+        This function counts the line index and position index of tokens for each clusters
+        The function will also check for the label if
+        :param cluster_labels:
+        :param embeds:
+        :param dataset: None or string; refers to the dataset to check
+        :return:
+        """
+        df = None
+        if dataset:
+            try:
+                df = self.dfs[dataset]
+            except KeyError:
+                df = None
+        result = {}
+        for cluster in set(cluster_labels):
+            result[cluster] = {'lineidx':[], 'positionidx':[]}
+            if df is not None:
+                result[cluster]['label'] = []
+        for i in range(len(cluster_labels)):
+            result[cluster_labels[i]]['lineidx'].append(embeds[i][1])
+            result[cluster_labels[i]]['positionidx'].append(embeds[i][2])
+            if df is not None:
+                line = embeds[i][1]
+                result[cluster_labels[i]]['label'].append(df.iloc[line]['label'])
+        return result
