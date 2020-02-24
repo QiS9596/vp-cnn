@@ -1,18 +1,19 @@
 import copy
+import os
 import random
 import time
-import os
 
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import pandas as pd
 import sklearn.decomposition as decomp
+from mpl_toolkits.mplot3d import Axes3D
 from sklearn import cluster
 from sklearn import preprocessing
 from sklearn.metrics import silhouette_samples
 from sklearn.metrics import silhouette_score
+
 Axes3D
 import token_db
 import tokenization
@@ -144,7 +145,7 @@ class BERTEmbedManager:
         ax_ = fig.add_subplot(1, 2, 2, projection='3d')
         ax.set_xlim([-1.0, 1.0])
         vertical_spacing = (n_clusters + 1) * 50
-        ax.set_ylim([-100, len(data) + vertical_spacing])
+        ax.set_ylim([-20, len(data) + vertical_spacing])
         average = silhouette_score(data, cluster_label)
         sample_silhouette_values = silhouette_samples(data, cluster_label)
 
@@ -220,7 +221,7 @@ class BERTEmbedManager:
         :param dimen_reduction_method: method for dimensionality reduction
         :param visualize_reduction_method: dimensionality reduction for visualization purpose
         :param output: str; path for output; if it's None, do not output; otherwise output the figure into target path
-        :param possible_clusters: str; if to plot the silhouette score for each
+        :param possible_clusters: str; if to plot the silhouette score for each possible cluster trial
         :return:
         """
         # collect the embeddings
@@ -233,10 +234,14 @@ class BERTEmbedManager:
         best_clustering = None
         best_n_clusters = None
         n_clusters_eval = []
+        # try different value of n_clusters, for each n cluster perform kmeans clustering
         for n_clusters in range(n_clusters_range[0], n_clusters_range[1], n_clusters_range[2]):
             clustering = self.KMeans_clustering_bert_token(token_embeddings, n_clusters, trials=trials)
+            # calculate the average silhouette score for the current clustering
+            # record the silhouette measurement with the correspond n-cluster
             average_silhouette_score = silhouette_score(token_embeddings, clustering.labels_)
             n_clusters_eval.append((n_clusters, average_silhouette_score))
+            # record the cluster with the highest silhouette score
             if average_silhouette_score > best_silhouette_score:
                 best_silhouette_score = average_silhouette_score
                 best_clustering = copy.deepcopy(clustering)
@@ -248,18 +253,18 @@ class BERTEmbedManager:
             if output == None:
                 output = None
                 if dimen_reduction_method is not None:
-                    title += ' with dimensional reduction method '+ dimen_reduction_method
+                    title += ' with dimensional reduction method ' + dimen_reduction_method
                 if possible_clusters == 'auto':
                     title_n_clusters = title + ' n-clusters silhouette'
                     output_n_clusters = None
             else:
-                name = dataset_name+'_'+token_name+'_' + str(layer) + '_kmeans_n-clusters'+ str(best_n_clusters)
+                name = dataset_name + '_' + token_name + '_' + str(layer) + '_kmeans_n-clusters' + str(best_n_clusters)
                 if dimen_reduction_method is not None:
                     name += '_dimen-reduction' + dimen_reduction_method
-                    title += ' with dimensional reduction method '+ dimen_reduction_method
+                    title += ' with dimensional reduction method ' + dimen_reduction_method
                 if possible_clusters == 'auto':
                     title_n_clusters = title + ' n-clusters silhouette'
-                    name_n_clusters = name +'_n_clusters_silhouette.png'
+                    name_n_clusters = name + '_n_clusters_silhouette.png'
                 if visualize_reduction_method == 'auto' and dimen_reduction_method is None:
                     name += '_visual-reductionPCA'
                 name += '.png'
@@ -303,7 +308,7 @@ class BERTEmbedManager:
                 df = None
         result = {}
         for cluster in set(cluster_labels):
-            result[cluster] = {'lineidx':[], 'positionidx':[]}
+            result[cluster] = {'lineidx': [], 'positionidx': []}
             if df is not None:
                 result[cluster]['label'] = []
         for i in range(len(cluster_labels)):
@@ -313,3 +318,101 @@ class BERTEmbedManager:
                 line = embeds[i][1]
                 result[cluster_labels[i]]['label'].append(df.iloc[line]['label'])
         return result
+
+    @staticmethod
+    def symmetric_kl_divergence(P, Q, add_one_smooth=True):
+        """
+        Measure the symmetric kl divergence of distribution P and distribution Q
+        Symmetric KL-divergence is measured as DKL(P || Q) + DKL(Q || P)
+        Both distribution P and distribution Q should be a python dictionary object and each item is correspond to the
+        number of instances of type key items in the correspond distribution.
+        The keys() of these two dictionary should be equal and the full set of all possible item values.
+        The value of the counts should be int. Could be 0 if the target type of instance does not exist in target
+        distribution
+        :param P: the first distribution
+        :param Q: the second distribution
+        :param add_one_smooth: Boolean, if to use add one smooth to add one instance of each type of item in both of the
+        distribution to avoid zero division
+        :return: the KL-divergence of distribution P and Q
+        """
+        assert P.keys() == Q.keys()
+        # add one smoothing
+        if add_one_smooth:
+            for key in P.keys():
+                P[key] += 1
+                Q[key] += 1
+
+        pq_diver = BERTEmbedManager.kl_divergence(P, Q)
+        qp_diver = BERTEmbedManager.kl_divergence(Q, P)
+        return pq_diver + qp_diver
+
+    @staticmethod
+    def kl_divergence(P, Q, normalized=False):
+        """
+        Calculate KL-divergence of two input distribution P and Q
+        P and Q should be dictionary, each key represent a certain type of instances, and the value is the count or
+        the probability of the occurrence of that instance.
+        :param P:
+        :param Q:
+        :param normalized: if the P and Q are dictionary of count or probabilities
+        :return:
+        """
+        # asymmetric version of KL-divergence
+        p_values = []
+        q_values = []
+        for key in P.keys():
+            if not Q[key] <= 0:
+                p_values.append(P[key])
+                q_values.append(Q[key])
+        p_values = np.array(p_values).astype(np.float)
+        q_values = np.array(q_values).astype(np.float)
+        if normalized:
+            p_total = 1.0
+            q_total = 1.0
+        else:
+            p_total = np.sum(p_values)
+            q_total = np.sum(q_values)
+        diver = 0.0
+        for i in range(p_values.shape[0]):
+            diver += p_values[i] * np.log(p_values[i] * q_total / q_values[i] / p_total)
+        diver /= p_total
+        return diver
+
+    @staticmethod
+    def jensen_shannon_divergence(P, Q, weighted=False):
+        """
+        Calculate Jensen Shannon divergence based on the input distribution.
+        Jensen Shannon distribution is a symmetric and smoothed version of KL-divergence
+        The Jensen Shannon divergence is calculated in the following manner
+        DJS = DKL(P || M) + DKL(Q || M)
+        where DKL is the asymmetric version of KL divergence and M is the average of the two input distribution
+        P and Q should be python dictionary, and have same keys() list. Each value of the item in the dictionary is the
+        count of number of a certain type(represented by the key) of instances in the target distribution, should be
+        an integer greater or equals to 1
+        :param P: dictionary; the first distribution
+        :param Q: dictionary; the second distribution
+        :param weighted: bool; if to use weighted mean of two distribution to calculate M or even mean of the two
+        distribution
+        :return: float; measured Jensen-Shannon divergence among the two input distribution
+        """
+        # assert that the two set of distribution has the same key set
+        assert P.keys() == Q.keys()
+        M = {}
+        if not weighted:
+            # calculate the distribution of P and Q based on their count
+            p_total = 0.0
+            q_total = 0.0
+
+            for key in P.keys():
+                p_total += float(P[key])
+                q_total += float(Q[key])
+            # calculate distribution and average distribution of P and Q, which is M
+            for key in P.keys():
+                P[key] = float(P[key]) / p_total
+                Q[key] = float(Q[key]) / q_total
+                M[key] = (P[key] + Q[key])/2
+            return BERTEmbedManager.kl_divergence(P, M, True) + BERTEmbedManager.kl_divergence(Q, M, True)
+        else:
+            for key in P.keys():
+                M[key] = P[key] + Q[key]
+            return BERTEmbedManager.kl_divergence(P, M, False) + BERTEmbedManager.kl_divergence(Q, M, False)
