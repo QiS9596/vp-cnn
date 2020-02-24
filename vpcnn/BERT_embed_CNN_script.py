@@ -52,7 +52,7 @@ args = parser.parse_args()
 # these are the things I don't want to add to the argument for now, but keep them here can making it easy to make it
 # changable without changing the grid search loop
 all_tsv_path = os.path.join(args.data_dir, 'all.tsv')
-label_tsv_path = os.path.join(args.data_dir, 'label.tsv')
+label_tsv_path = os.path.join(args.data_dir, 'labels.tsv')
 bert_data_npy = os.path.join(args.data_dir, 'all_'+args.embed_method+'.npy')
 bert_label_npy = os.path.join(args.data_dir, 'labels_'+args.embed_method+'.npy')
 possible_optimizers = ['adadelta']
