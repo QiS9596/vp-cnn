@@ -62,13 +62,21 @@ class VPDataset_bert_embedding(Dataset):
         num_example = len(df.index)
         # handle each row
         for row_idx in range(num_example):
+            err = []
+            for i in range(len(df['embed'][row_idx])):
+                if not df['embed'][row_idx][i].shape == (768,):
+                    err.append(i)
+            temp = [df['embed'][row_idx][x] for x in range(len(df['embed'][row_idx])) if x not in err]
+            df['embed'][row_idx] = np.array(temp)
+            
             current_row_len = len(df['embed'][row_idx])
             # if the current row has the same length as the max sequence length, do nothing
             if current_row_len == max_seq_len:
+                df['embed'][row_idx] = np.array(df['embed'][row_idx])
                 continue
             # if the current row has longer sequence, then cut
             elif current_row_len > max_seq_len:
-                df['embed'][row_idx] = df['embed'][row_idx][:max_seq_len, :]
+                df['embed'][row_idx] = np.array(df['embed'][row_idx][:max_seq_len])
             # if the current row has shorter sequence, then pad
             else:
                 df['embed'][row_idx] = np.pad(df['embed'][row_idx],
@@ -200,6 +208,24 @@ class VPDataset_bert_embedding(Dataset):
         # TODO complete selecting development set
         dev_df = train_df[int(-1*dev_length):]
         train_df_ = pd.concat([train_df_[:int(-1*dev_length)], label_df])
+        for element in train_df_['embed']:
+            if not isinstance(element, np.ndarray):
+                print('train set')
+                print(type(element))
+                print(len(element))
+                print(element[0].shape)
+        for element in dev_df['embed']:
+            if not isinstance(element, np.ndarray):
+                print('development set')
+                print(type(element))
+                print(len(element))
+                print(element[0].shape)
+        for element in eval_df['embed']:
+            if not isinstance(element, np.ndarray):
+                print('evaluation set')
+                print(type(element))
+                print(len(element))
+                print(element[0].shape)
         return (cls(df=train_df_),
                 cls(df=dev_df),
                 cls(df=eval_df))

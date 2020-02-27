@@ -87,7 +87,7 @@ class BERTEmbedManager:
             sentence = self.tokenizer.tokenize(df.iloc[i]['text'])
             sentence_embed = []
             for word in sentence:
-                word = self.db_manager.rmv_punc(word)
+                word = self.db_manager.rpl_punc(word)
                 try:
                     sentence_embed.append(embed_dict[word])
                 except KeyError:
@@ -109,7 +109,7 @@ class BERTEmbedManager:
             for sentence in sup['text']:
                 sentence_embed = []
                 for word in self.tokenizer.tokenize(sentence):
-                    word = self.db_manager.rmv_punc(word)
+                    word = self.db_manager.rpl_punc(word)
                     try:
                         sentence_embed.append(embed_dict[word])
                     except KeyError:
@@ -130,7 +130,7 @@ class BERTEmbedManager:
                 sentence = self.tokenizer.tokenize(df.iloc[i]['text'])
                 sentence_embed = []
                 for word in sentence:
-                    word = self.db_manager.rmv_punc(word)
+                    word = self.db_manager.rpl_punc(word)
                     try:
                         sentence_embed.append(embed_dict[word])
                     except KeyError:

@@ -4,7 +4,6 @@ This module provide tools for applying analysis towards bert embeddings
 import json
 import sqlite3
 import time
-from string import punctuation
 
 import numpy as np
 
@@ -58,6 +57,10 @@ class BERTDBProcessor:
             CREATE TABLE IF NOT EXISTS BERT (dataset TEXT PRIMARY KEY)
         """)
         self.conn.commit()
+        self.punc = {'[': 'LEFT_BRACKET', ']': 'RIGHT_BRACKET', '(': 'LEFT_PARENTHESIS', ')': 'RIGHT_PARENTHESIS',
+                     '.': 'DOT', ',': 'COMMA', '#': 'SHARP', '!': 'EXCLAM', '-': 'DASH', '?': 'QUES', '\'': 'APOS',
+                     '\"': 'QUOT', '*': 'ASTE', '/':'SLASH', '\\':'RETURN',';':'SCOLON', ':':'COLONSIGN', '>':'GT', '<':'LT',
+                     '&':'ANDSIGN'}
 
     def __del__(self):
         self.conn.close()
@@ -101,6 +104,7 @@ class BERTDBProcessor:
         :return: False if target dataset table does not exist; otherwise True
         """
         # check if the correspond dataset table exist
+        token_name = self.rpl_punc(token_name)
         self.c.execute("""
             SELECT * FROM sqlite_master WHERE type='table' AND name=?;
         """, [dataset_name])
@@ -114,10 +118,14 @@ class BERTDBProcessor:
         self.conn.commit()
         # after the insertion, create the correspond table
         table_name = dataset_name + '_' + token_name
-        self.c.execute("""
-            CREATE TABLE IF NOT EXISTS {} (layer TEXT, embedding TEXT, lineidx INT, positionidx INT)
-        """.format(table_name))
-        self.conn.commit()
+        try:
+            self.c.execute("""
+                CREATE TABLE IF NOT EXISTS {} (layer TEXT, embedding TEXT, lineidx INT, positionidx INT)
+            """.format(table_name))
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            print("err" + table_name)
+            raise KeyboardInterrupt
         return True
 
     def insert_embedding(self, dataset_name, token_name, layer, embedding, lineidx, positionidx):
@@ -137,6 +145,7 @@ class BERTDBProcessor:
         :return: False if the target table does not exists, True other wise
         """
         # check if the correspond dataset_name_token table exists
+        token_name = self.rpl_punc(token_name)
         table_name = dataset_name + '_' + token_name
         self.c.execute("""
             SELECT * FROM sqlite_master WHERE type='table' AND name=?;
@@ -181,6 +190,29 @@ class BERTDBProcessor:
         self.conn.commit()
         return result
 
+    def get_list_tokens(self, dataset_name):
+        """
+        get a list of tokens for the particular dataset
+        :param dataset_name: name of the target dataset
+        :return: list of str, each one is an embedding
+        """
+        # check if target dataset exists
+        self.c.execute("""
+            SELECT * FROM sqlite_master WHERE type='table' AND name=?
+        """, [dataset_name])
+        self.conn.commit()
+        if len(self.c.fetchall()) <= 0:
+            return False
+        # then fetch the tokens for this dataset
+        self.c.execute("""
+            SELECT token FROM {} 
+        """.format(dataset_name))
+        result = self.c.fetchall()
+        self.conn.commit()
+        result_ = [i[0] for i in result]
+        return result_
+
+
     def get_embeddings(self, dataset_name, token_name):
         """
         Get a collection of word embedding for all appearances of target token in the correspond dataset
@@ -190,6 +222,7 @@ class BERTDBProcessor:
         :param token_name: string; name of the target token
         :return: False if the table of target dataset_name_token table does not exist; otherwise a list
         """
+        token_name = self.rpl_punc(token_name)
         table_name = dataset_name + '_' + token_name
         # check if the target table exists
         self.c.execute("""
@@ -219,6 +252,7 @@ class BERTDBProcessor:
         :return: False if the table of target dataset_name_token does not exist; otherwise a list of numpy.array
         """
         layer = str(layer)
+        token_name = self.rpl_punc(token_name)
         table_name = dataset_name + '_' + token_name
         # check if the target table exists
         self.c.execute("""
@@ -259,6 +293,7 @@ class BERTDBProcessor:
         embeddings
         :return: False if target table does not exists, otherwise a numpy array as the average embedding of target token
         """
+        token_name = self.rpl_punc(token_name)
         embeds_ = []
         for i in range(len(datasets_name)):
             dataset_name = datasets_name[i]
@@ -266,9 +301,11 @@ class BERTDBProcessor:
             embeds = self.get_embeddings_on_row(dataset_name, token_name, line_ids, layer)
             if embeds:
                 embeds_ += embeds
-
-        return np.average(embeds_, axis=0)
-
+        result = np.average(embeds_, axis=0)
+        if np.isnan(result).any():
+            print(token_name)
+            print(embeds_)
+        return result
 
     @staticmethod
     def unpack_fetch_all_embeddings(embeds):
@@ -332,6 +369,7 @@ class BERTDBProcessor:
         :return: False if target dataset or token does not exist; True otherwise
         """
         # we directly check the correspond dataset_name_token table
+        token_name = self.rpl_punc(token_name)
         table_name = dataset_name + '_' + token_name
         self.c.execute("""
             SELECT * FROM sqlite_master WHERE type='table' and name=?
@@ -372,9 +410,15 @@ class BERTDBProcessor:
                 features = line_dict['features']
                 for i in range(len(features)):
                     token = features[i]
-                    token_name = self.rmv_punc(token['token'])
-                    self.create_dataset_token_table(dataset_name, token_name)
-                    self.increment_token_count(dataset_name, token_name)
+                    token_name = self.rpl_punc(token['token'])
+
+                    # token_name = token['token']
+                    a = self.create_dataset_token_table(dataset_name, token_name)
+                    b = self.increment_token_count(dataset_name, token_name)
+                    if token['token'] == '&':
+                        print('found token &')
+                        print(a)
+                        print(b)
                     for layer in token['layers']:
                         layeridx = layer['index']
                         embed = np.array(layer['values'])
@@ -388,6 +432,14 @@ class BERTDBProcessor:
                         progress, file_lines, time_used, estimated_finish))
                 progress += 1
 
+    def test_fun(self):
+        self.c.execute("""
+            SELECT * FROM VP1617STRICT
+        """)
+        result = self.c.fetchall()
+        self.conn.commit()
+        return result
+
     @staticmethod
     def getline(file):
         with open(file) as f:
@@ -395,11 +447,13 @@ class BERTDBProcessor:
                 pass
         return i + 1
 
-    @staticmethod
-    def rmv_punc(string_):
+    def rpl_punc(self, string_):
         """
-        remove the punctuations for the input string
+        replace the punctuations for the input string to avoid syntax conflict with db
         :param string_: input string
         :return: string_ with punctuations removed
         """
-        return ''.join(c for c in string_ if c not in punctuation)
+
+        replaced = ''.join(c if c not in self.punc.keys() else self.punc[c] for c in string_)
+        # print(replaced)
+        return replaced

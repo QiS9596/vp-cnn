@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import autograd
 from torch.nn import init
+import numpy as np
 
 
 class CNN_Embed(nn.Module):
