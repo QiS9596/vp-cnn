@@ -13,6 +13,7 @@ from sklearn import cluster
 from sklearn import preprocessing
 from sklearn.metrics import silhouette_samples
 from sklearn.metrics import silhouette_score
+import seaborn as sns
 
 Axes3D
 import token_db
@@ -166,7 +167,7 @@ class BERTEmbedManager:
                              edgecolor=color,
                              alpha=0.7)
             ax.text(-0.05, y_lower + 0.5 * size_cluster_i, str(i))
-            y_lower = y_upper + 10
+            y_lower = y_upper + 35
         ax.set_title('Silhouette Plot')
         ax.set_xlabel('Silhouette Score')
         ax.set_ylabel('Cluster Label')
@@ -184,6 +185,8 @@ class BERTEmbedManager:
             plt.savefig(output)
         if show:
             plt.show()
+        fig.clear()
+        plt.close(fig)
 
     def line_plot_silhouette(self, n_cluster_eval, title='', show=True, output=None):
         """"""
@@ -195,6 +198,8 @@ class BERTEmbedManager:
             plt.savefig(output)
         if show:
             plt.show()
+        plt.close()
+
 
     def clustering_analysis_BERT_token_kmeans(self, dataset_name, token_name, layer, n_clusters_range=[2, 15, 2],
                                               trials=30, plot_fig=False, dimen_reduction_method=None,
@@ -294,11 +299,16 @@ class BERTEmbedManager:
     def on_cluster_statistics(self, cluster_labels, embeds, dataset=None):
         """
         This function counts the line index and position index of tokens for each clusters
-        The function will also check for the label if
-        :param cluster_labels:
-        :param embeds:
+        The function will also check for the label if data set is provided
+        The returning value of this method is a nested dictionary, each item in this dictionary represent some count
+        value of this statistics, including a list of line index and a list of position index, if dataset is provided
+        then it will also check the class label of the sentence that the token comes from. These statistics can be used
+        to study how difference the distribution of token embeddings in the embedding space might be caused or might
+        contribute to the classification process.
+        :param cluster_labels: cluster labels obtained from clustering algorithms
+        :param embeds: a list of tuple, each tuple contains embeddings lineindex and position index
         :param dataset: None or string; refers to the dataset to check
-        :return:
+        :return: a nested dictionary
         """
         df = None
         if dataset:
@@ -318,6 +328,79 @@ class BERTEmbedManager:
                 line = embeds[i][1]
                 result[cluster_labels[i]]['label'].append(df.iloc[line]['label'])
         return result
+
+    def cluster_label_divergence(self, on_cluster_stat, divergence='jsd', parameter_dict={}, show=False,
+                                 title=None, output=None):
+        """
+        Calculate group-wise divergence of the label, to see if different cluster of embedding suggests different
+        distribution of class that they belongs to.
+        After calculating the group-wise divergence, we use heatmap to illustrate the group-wise divergence. If show is
+        set to True, then the plot is shown, if the output is not None, then the plot will be saved to target location.
+        If output is None and show is False, then the plot will not be rendered at all
+        :param on_cluster_stat: a nested python dictionary, generated using on_cluster_statistics
+        :param divergence: string; indication which divergence calculation function to be used, could be either jsd
+        for Jensen-Shannon divergence, skld for symmetric KL divergence. Any unidentified value will result in using jsd
+        :param parameter_dict: python dictionary, optional parameters for divergence calculation method
+        :param show: bool, if to show the plot.
+        :param output: None or str
+        :return: a square np.ndarray that has dimensionality of 2, array[i][j] = array[j][i] and represent the
+        divergence of class label distribution between these two clusters
+        """
+
+        # cluster label starts from 0, so we add 1 to the max cluster number index to get the number of clusters
+        num_clusters = np.max(list(on_cluster_stat.keys())) + 1
+        # intialize the np.ndarray to -1, which is impossible for the divergence to achieve
+        groupwise_div = np.full((num_clusters, num_clusters), -1.0)
+        for i in range(num_clusters):
+            for j in range(i, num_clusters):
+                i_dist = {}
+                j_dist = {}
+                assert 'label' in set(on_cluster_stat[i].keys())
+                assert 'label' in set(on_cluster_stat[j].keys())
+                cluster_i_label = on_cluster_stat[i]['label']
+                cluster_j_label = on_cluster_stat[j]['label']
+                # get possible labels set for i and j th cluster
+                possible_labels = set(cluster_i_label + cluster_j_label)
+                # initialize the dictionary
+                for label in possible_labels:
+                    i_dist[label] = 0
+                    j_dist[label] = 0
+                # count the instance of label for each cluster
+                for label in cluster_i_label:
+                    i_dist[label] += 1
+                for label in cluster_j_label:
+                    j_dist[label] += 1
+                # calculate divergence
+                if divergence == 'skld':
+                    try:
+                        add_one_smooth = parameter_dict['add_one_smooth']
+                    except KeyError:
+                        add_one_smooth = True
+                    div_ij = self.symmetric_kl_divergence(i_dist, j_dist, add_one_smooth)
+                else:
+                    try:
+                        weighted = parameter_dict['weighted']
+                    except KeyError:
+                        weighted = False
+                    div_ij = self.jensen_shannon_divergence(i_dist, j_dist, weighted)
+                # fill the value in target location, we are only using symmetric divergence, so the result array will
+                # also be symmetric
+                groupwise_div[i][j] = div_ij
+                groupwise_div[j][i] = div_ij
+        #visualization
+        if show or output is not None:
+            ax = sns.heatmap(groupwise_div)
+            # plt.imshow(groupwise_div, cmap='hot', interpolation='nearest', projection='2d')
+            ax.set_title(title)
+            if output is not None:
+                plt.savefig(os.path.join(output, str(num_clusters)+'.png'))
+            if show:
+                plt.show()
+            ax = None
+            plt.close()
+
+        return groupwise_div
+
 
     @staticmethod
     def symmetric_kl_divergence(P, Q, add_one_smooth=True):
@@ -374,7 +457,10 @@ class BERTEmbedManager:
             q_total = np.sum(q_values)
         diver = 0.0
         for i in range(p_values.shape[0]):
-            diver += p_values[i] * np.log(p_values[i] * q_total / q_values[i] / p_total)
+            if not p_values[i] == 0.0:
+                diver += p_values[i] * np.log(p_values[i] * q_total / q_values[i] / p_total)
+
+
         diver /= p_total
         return diver
 
@@ -410,7 +496,7 @@ class BERTEmbedManager:
             for key in P.keys():
                 P[key] = float(P[key]) / p_total
                 Q[key] = float(Q[key]) / q_total
-                M[key] = (P[key] + Q[key])/2
+                M[key] = (P[key] + Q[key]) / 2
             return BERTEmbedManager.kl_divergence(P, M, True) + BERTEmbedManager.kl_divergence(Q, M, True)
         else:
             for key in P.keys():
