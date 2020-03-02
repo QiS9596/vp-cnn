@@ -18,7 +18,7 @@ import seaborn as sns
 Axes3D
 import token_db
 import tokenization
-
+from string import punctuation
 
 class BERTEmbedManager:
     """
@@ -35,6 +35,7 @@ class BERTEmbedManager:
         self.db_manager = token_db.BERTDBProcessor(db_file)
         self.tokenizer = tokenization.FullTokenizer(bert_vocab)
         self.dfs = {}
+        self.w2v_matrix = None
 
     def load_nl_df(self, path, dataset_name, sep='\t', header=None, names=['label', 'text']):
         """
@@ -59,6 +60,39 @@ class BERTEmbedManager:
             self.dfs.pop(dataset_name)
         except KeyError:
             return
+
+    def load_w2v_matrix(self, path):
+        """
+        Load target w2v matrix
+        :param path: path to the w2v.txt file
+        :return:
+        """
+        if self.w2v_matrix is None:
+            self.w2v_matrix = {}
+        with open(path) as file:
+            for line in file.readlines():
+                splitted = line.split(' ')
+                token = splitted[0]
+                embed = [float(i) for i in splitted[1:]]
+                self.w2v_matrix[token] = np.array(embed)
+
+    def w2v_embedding(self, tsv_file):
+        result = []
+        if isinstance(tsv_file, str):
+            df = pd.read_csv(tsv_file, sep='\t', header=None, names=['label', 'text'])
+        else:
+            df = tsv_file
+        #TODO
+
+    def simple_tokenize(self, sentence):
+        """
+        The simplest version of tokenization, used in getting the token embedding with w2v static embeddings
+        :param sentence: string ,the input sentence
+        :return: list of strings, each string is a token
+        """
+        sentence = sentence.lower()
+        sentence = self.rmv_punc(sentence)
+        return sentence.split(' ')
 
     def embed_average_bert(self, tsv_file, train_line_ids, layer, dataset_name, supplimentary_tarining_set=None,
                            sup_df=None):
@@ -401,6 +435,15 @@ class BERTEmbedManager:
 
         return groupwise_div
 
+    @staticmethod
+    def rmv_punc(input_str):
+        """
+        Remove all punctuations from the string
+        Return the new string
+        :param input_str: str; input string
+        :return: input string with punctuations removed
+        """
+        return ''.join(c for c in input_str if c not in punctuation)
 
     @staticmethod
     def symmetric_kl_divergence(P, Q, add_one_smooth=True):
