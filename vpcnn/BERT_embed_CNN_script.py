@@ -23,7 +23,7 @@ parser.add_argument('-nkernels-low', type=int, default=50, help='minimum number 
 parser.add_argument('-nkernels-high', type=int, default=800, help='maximum number of each type of filters [default:800]')
 parser.add_argument('-nkernels-step', type=int, default=50, help='step size of number of each type of filters [default:50]')
 parser.add_argument('-embed-method', type=str, default='avg4', help='method of extracting embedding from BERT [default:avg4]')
-
+parser.add_argument('-npy-post-fix', type=str, default='auto', help='npy file post fix for the script to look for target npy file [default:auto]')
 parser.add_argument('-data-dir', type=str, default='data/bert_embeddings', help='path to dataset [default:data/bert_embeddings]')
 parser.add_argument('-splitted', action='store_true', default=False, help='set if to load splitted dataset for cross-validation [default:False]')
 # TODO : integrate load splitted dataset in to script
@@ -53,8 +53,12 @@ args = parser.parse_args()
 # changable without changing the grid search loop
 all_tsv_path = os.path.join(args.data_dir, 'all.tsv')
 label_tsv_path = os.path.join(args.data_dir, 'labels.tsv')
-bert_data_npy = os.path.join(args.data_dir, 'all_'+args.embed_method+'.npy')
-bert_label_npy = os.path.join(args.data_dir, 'labels_'+args.embed_method+'.npy')
+if args.npy_post_fix == 'auto':
+    npy_post_fix = args.embed_method
+else:
+    npy_post_fix = args.npy_post_fix
+bert_data_npy = os.path.join(args.data_dir, 'all_'+npy_post_fix+'.npy')
+bert_label_npy = os.path.join(args.data_dir, 'labels_'+npy_post_fix+'.npy')
 possible_optimizers = ['adadelta']
 validation_sum = 0.0
 # we keep this possible combination of layers here, if we further want to search them it would be easy to refactor
