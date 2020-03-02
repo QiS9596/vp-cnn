@@ -77,12 +77,39 @@ class BERTEmbedManager:
                 self.w2v_matrix[token] = np.array(embed)
 
     def w2v_embedding(self, tsv_file):
-        result = []
+        """
+        use w2v embedding to embed the data.
+        the w2v embedding matrix should be loaded into this embedding manager object via load_w2v_matrix
+        the tokenization pipeline for a sentence is merely remove the punctuations, shift to lower case and split on
+        spaces
+        if OOV is found, use a random word to replace
+
+        :param tsv_file: the tsv file of the texts to be transformed
+        :return: a numpy.ndarray or None
+        """
+        if self.w2v_matrix is None:
+            return None
         if isinstance(tsv_file, str):
             df = pd.read_csv(tsv_file, sep='\t', header=None, names=['label', 'text'])
         else:
             df = tsv_file
-        #TODO
+        result = []
+        for sentence_idx in range(len(list(df.index))):
+            sentence = df.iloc[sentence_idx]['text']
+            tokens = self.simple_tokenize(sentence)
+            sentence_embed = []
+            for token in tokens:
+                try:
+                    embed = self.w2v_matrix[token]
+                except KeyError:
+                    random_token = random.choice(list(self.w2v_matrix.keys()))
+                    embed = self.w2v_matrix[random_token]
+                sentence_embed.append(np.array(embed))
+            result.append(np.array(sentence_embed))
+        return np.array(result)
+
+
+
 
     def simple_tokenize(self, sentence):
         """
