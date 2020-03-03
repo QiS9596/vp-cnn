@@ -87,7 +87,8 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
             logit = model(feature)
             target = autograd.Variable(target).cuda()
             # step 3: compute loss, here negative log likelihood is employed
-            loss = F.cross_entropy(input=logit, target=target)
+            # loss = F.cross_entropy(input=logit, target=target)
+            loss = F.nll_loss(logit, target)
             # step 4: use loss to produce gradient
             loss.backward()
             # step 5: update weights

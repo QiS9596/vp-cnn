@@ -67,6 +67,8 @@ class CNN_Embed(nn.Module):
             self.fc1.bias.data.zero_()
         elif fc_init == 'default':
             pass
+        print(sum(p.numel() for p in self.parameters() if p.requires_grad))
+
 
     def forward(self, x):
         x = self.confidence(x)

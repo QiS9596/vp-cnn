@@ -48,7 +48,7 @@ class VPDataset_bert_embedding(Dataset):
         return df_
 
     @staticmethod
-    def sequence_padding(df, max_seq_len=32):
+    def sequence_padding(df, max_seq_len=32, embed_dim=768):
         """
         pad the sequence of the 'embed' field for the target dataframe object.
         each element of embed field should be a np.array object, which has two dimensionalities N*M; representing N
@@ -64,7 +64,7 @@ class VPDataset_bert_embedding(Dataset):
         for row_idx in range(num_example):
             err = []
             for i in range(len(df['embed'][row_idx])):
-                if not df['embed'][row_idx][i].shape == (768,):
+                if not df['embed'][row_idx][i].shape == (embed_dim,):
                     err.append(i)
             temp = [df['embed'][row_idx][x] for x in range(len(df['embed'][row_idx])) if x not in err]
             df['embed'][row_idx] = np.array(temp)
@@ -78,6 +78,8 @@ class VPDataset_bert_embedding(Dataset):
             elif current_row_len > max_seq_len:
                 df['embed'][row_idx] = np.array(df['embed'][row_idx][:max_seq_len])
             # if the current row has shorter sequence, then pad
+            elif df['embed'][row_idx].shape[0] == 0:
+                df['embed'][row_idx] = np.zeros((max_seq_len, embed_dim))
             else:
                 df['embed'][row_idx] = np.pad(df['embed'][row_idx],
                                               ((0, max_seq_len - current_row_len), (0, 0)),
@@ -87,7 +89,7 @@ class VPDataset_bert_embedding(Dataset):
 
     @classmethod
     def splits(cls, num_fold=10, foldid=0, root='.', filename=None, label_filename=None, train_npy_name=None,
-               label_npy_name=None, num_experts=5, dev_split=0.1, max_seq_len=32):
+               label_npy_name=None, num_experts=5, dev_split=0.1, max_seq_len=32, embed_dim=768):
         """
         This method splits the dataset into two parts: the training data and the testing data. We would not use
         development set to monitor the performance on unseen data during the training.
@@ -133,8 +135,8 @@ class VPDataset_bert_embedding(Dataset):
         df['embed'] = npy_data
         df_label = df_label['labels'].to_frame()
         df_label['embed'] = npy_label
-        df = VPDataset_bert_embedding.sequence_padding(df, max_seq_len=max_seq_len)
-        df_label = VPDataset_bert_embedding.sequence_padding(df_label, max_seq_len=max_seq_len)
+        df = VPDataset_bert_embedding.sequence_padding(df, max_seq_len=max_seq_len, embed_dim=embed_dim)
+        df_label = VPDataset_bert_embedding.sequence_padding(df_label, max_seq_len=max_seq_len, embed_dim=embed_dim)
         # We split the data into k splits
         fold_dfs = np.array_split(ary=df, indices_or_sections=num_fold)
         # claim test fold

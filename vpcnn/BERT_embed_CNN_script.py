@@ -26,6 +26,7 @@ parser.add_argument('-embed-method', type=str, default='avg4', help='method of e
 parser.add_argument('-npy-post-fix', type=str, default='auto', help='npy file post fix for the script to look for target npy file [default:auto]')
 parser.add_argument('-data-dir', type=str, default='data/bert_embeddings', help='path to dataset [default:data/bert_embeddings]')
 parser.add_argument('-splitted', action='store_true', default=False, help='set if to load splitted dataset for cross-validation [default:False]')
+parser.add_argument('-embed-dim', type=int, default=768, help='embedding dimensionality')
 # TODO : integrate load splitted dataset in to script
 # could be used to test cnn for bert embedding cnn, rcnn for dimensionality Reduced CNN, and aed for AutoEncoderDecoder
 parser.add_argument('-model-mode', type=str, default='cnn', help='model to be tested, possible value[cnn; rcnn; aed], [default:cnn]')
@@ -108,7 +109,8 @@ def get_10fold_acc(n_kernels=500, lr=1e-3, epochs=1000, batch_size=50, optimizer
                                                                                label_filename=label_tsv_path,
                                                                                train_npy_name=bert_data_npy,
                                                                                label_npy_name=bert_label_npy,
-                                                                               num_experts=0)
+                                                                               num_experts=0,
+                                                                               embed_dim=args.embed_dim)
         if args.model_mode == 'cnn':
             mdl = model_bert.CNN_Embed(kernel_num=n_kernels, class_num = class_num, embed_dim=embed_dim)
             acc,model = bert_train.train_wraper(train_iter=train, dev_iter=dev, optimizer=optimizer, model=mdl, lr=lr, epochs=epochs, batch_size=batch_size)
@@ -136,6 +138,7 @@ if args.embed_method == 'concat4':
     embed_dim = 768*4
 else:
     embed_dim = 768
+embed_dim = args.embed_dim
 result = []
 if args.model_mode == 'cnn':
     for lr in np.arange(args.lr_low, args.lr_high+args.lr_step, args.lr_step):
