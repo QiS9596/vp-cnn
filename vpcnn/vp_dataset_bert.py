@@ -144,6 +144,7 @@ class VPDataset_bert_embedding(Dataset):
         # then concat the rest fold as train-dev data
         train_dev_folds = fold_dfs[:foldid] + fold_dfs[foldid + 1:]
         df_train_dev = pd.concat(train_dev_folds)
+        df_train_dev = df_train_dev.sample(frac=1)
         dev_length = int(np.floor(dev_split * float(len(df_train_dev))))
         # if the num_experts == 0, then it indicates only one CNN model is trained
         if num_experts == 0:
