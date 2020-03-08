@@ -109,7 +109,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
         if acc > best_acc:
             best_model = copy.deepcopy(model)
     model = best_model
-    acc = eval(dev, model, batch_size, use_cuda, output=True)
+    acc = eval(dev, model, batch_size, use_cuda)
     return acc, model
 
 
@@ -225,7 +225,7 @@ def eval_wraper(data_iter, model, batch_size, use_cuda=True, mode='classifier'):
     """
     classifier_modes = ['classifier', 'plain_cnn', 'cnn_shirnk_dim']
     if mode in classifier_modes:
-        return eval(data_iter=data_iter, model=model, batch_size=batch_size, use_cuda=use_cuda)
+        return eval(data_iter=data_iter, model=model, batch_size=batch_size, use_cuda=use_cuda, output=True)
     elif mode == 'auto_encoder_decoder':
         data_iter_ = vp_dataset_bert.AutoEncoderPretrainDataset.from_VPDataset_bert_embedding(data_iter)
         return model_bert.AutoEncoderDecoder.eval_mdl(data_iter=data_iter_, model=model, batch_size=batch_size,

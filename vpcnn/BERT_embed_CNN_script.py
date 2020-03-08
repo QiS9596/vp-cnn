@@ -162,7 +162,8 @@ if args.model_mode == 'cnn':
                         df = pd.DataFrame(data=result_,
                                           columns=['n_kernels', 'lr', 'epochs', 'batch_size', 'optimizer', 'embed_dim', 'acc'])
                         df.to_csv(args.logdir)
-                        quit()
+                        if args.oneset:
+                            quit()
 if args.model_mode == 'aed':
     for lr in np.arange(args.pretrain_lr_low,
                         args.pretrain_lr_high+args.pretrain_lr_step,
