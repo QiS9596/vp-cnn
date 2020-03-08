@@ -11,7 +11,7 @@ import torch.nn.functional as F
 import vp_dataset_bert
 from torch.utils.data import DataLoader
 
-
+file_path = './data/case.txt'
 def generate_batches(dataset, batch_size, shuffle=False, drop_last=False, device='cuda'):
     """
     generator function wraps pytorch dataloader
@@ -109,7 +109,7 @@ def train(train, dev, model, optimizer='adam', use_cuda=True, lr=1e-3, l2=1e-6, 
         if acc > best_acc:
             best_model = copy.deepcopy(model)
     model = best_model
-    acc = eval(dev, model, batch_size, use_cuda)
+    acc = eval(dev, model, batch_size, use_cuda, output=True)
     return acc, model
 
 
@@ -162,7 +162,7 @@ def train_wraper(train_iter, dev_iter, model, optimizer='adam', use_cuda=True, l
                                                        use_cuda=use_cuda, epochs=pretrain_epochs)
 
 
-def eval(data_iter, model, batch_size, use_cuda=True):
+def eval(data_iter, model, batch_size, use_cuda=True, output=False):
     """
     evaluation method for single model
     :param data_iter: dataset object for evaluation
@@ -188,6 +188,18 @@ def eval(data_iter, model, batch_size, use_cuda=True):
         avg_loss += loss.data[0]
         corrects += (torch.max(logit, 1)
                      [1].view(target.size()).data == target.data).sum()
+        probs, predicted = torch.max(torch.exp(logit),1)
+        predicted = predicted.cpu().data.numpy()
+        target = target.data.cpu().numpy()
+        print(predicted)
+        print(target)
+        if output:
+            with open(file_path, 'a') as file:
+                for i in range(predicted.shape[0]):
+                    file.write(str(predicted[i][0]))
+                    file.write(' ')
+                    file.write(str(target[i]))
+                    file.write('\n')
     avg_loss /= len(data_iter)
     accuracy = corrects / len(data_iter) * 100.0
     model.train()

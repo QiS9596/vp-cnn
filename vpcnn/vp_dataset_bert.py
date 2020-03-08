@@ -43,7 +43,6 @@ class VPDataset_bert_embedding(Dataset):
         df_ = pd.read_csv(tsv_path, sep='\t', header=None, names=['label', 'text'])
         matrix = np.load(npy_path, allow_pickle=True)
         assert len(list(df_.index)) == matrix.shape[0]
-        df_.drop(['text'], axis=1)
         df_['embed'] = matrix
         return df_
 
@@ -126,8 +125,8 @@ class VPDataset_bert_embedding(Dataset):
         label_path = os.path.join(root, label_filename)
         data_npy_path = os.path.join(root, train_npy_name)
         label_npy_path = os.path.join(root, label_npy_name)
-        df = pd.read_csv(data_path, sep='\t', header=None, names=['labels', 'embed'])
-        df_label = pd.read_csv(label_path, sep='\t', header=None, names=['labels', 'embed'])
+        df = pd.read_csv(data_path, sep='\t', header=None, names=['labels', 'text'])
+        df_label = pd.read_csv(label_path, sep='\t', header=None, names=['labels', 'text'])
 
         npy_data = np.load(data_npy_path, allow_pickle=True)
         npy_label = np.load(label_npy_path, allow_pickle=True)

@@ -27,6 +27,8 @@ parser.add_argument('-npy-post-fix', type=str, default='auto', help='npy file po
 parser.add_argument('-data-dir', type=str, default='data/bert_embeddings', help='path to dataset [default:data/bert_embeddings]')
 parser.add_argument('-splitted', action='store_true', default=False, help='set if to load splitted dataset for cross-validation [default:False]')
 parser.add_argument('-embed-dim', type=int, default=768, help='embedding dimensionality')
+parser.add_argument('-case-study', type=str, default='./data/case.txt')
+parser.add_argument('-oneset', action='store_true', default=False, help='only test one hyperparameter set')
 # TODO : integrate load splitted dataset in to script
 # could be used to test cnn for bert embedding cnn, rcnn for dimensionality Reduced CNN, and aed for AutoEncoderDecoder
 parser.add_argument('-model-mode', type=str, default='cnn', help='model to be tested, possible value[cnn; rcnn; aed], [default:cnn]')
@@ -52,6 +54,7 @@ parser.add_argument('-logdir', type=str, default='./data/result.csv', help='resu
 args = parser.parse_args()
 # these are the things I don't want to add to the argument for now, but keep them here can making it easy to make it
 # changable without changing the grid search loop
+bert_train.file_path = args.case_study
 all_tsv_path = os.path.join(args.data_dir, 'all.tsv')
 label_tsv_path = os.path.join(args.data_dir, 'labels.tsv')
 if args.npy_post_fix == 'auto':
@@ -159,6 +162,7 @@ if args.model_mode == 'cnn':
                         df = pd.DataFrame(data=result_,
                                           columns=['n_kernels', 'lr', 'epochs', 'batch_size', 'optimizer', 'embed_dim', 'acc'])
                         df.to_csv(args.logdir)
+                        quit()
 if args.model_mode == 'aed':
     for lr in np.arange(args.pretrain_lr_low,
                         args.pretrain_lr_high+args.pretrain_lr_step,
