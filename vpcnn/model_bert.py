@@ -85,6 +85,14 @@ class CNN_Embed(nn.Module):
         x = self.dropout(x)
         linear_out = self.fc1(x)
         return linear_out
+    
+    def sentence_level_representation(self,x):
+        x = autograd.Variable(x.float()).cuda()
+        x = x.unsqueeze(1)
+        x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]
+        x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x]
+        x = torch.cat(x, 1)
+        return x
 
 
 class BaseAutoEncoderDecoder(nn.Module, ABC):
