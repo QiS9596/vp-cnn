@@ -342,6 +342,33 @@ class BERTEmbedManager:
                 self.line_plot_silhouette(n_clusters_eval, title=title, show=plot_fig, output=output_n_clusters)
         return best_n_clusters, best_clustering, best_silhouette_score, n_clusters_eval, token_records
 
+    def clustering_raw_embedding(self, df, embed_column='embed', label_column='labels', n_cluster_range=[2,15,2],
+                                 trials=30, plot_fig=False, dimen_reducetion_method=None,
+                                 visualization_reduction_method='auto', output=None, possible_clusters='auto'):
+        """
+
+        :param df:
+        :param embed_column:
+        :param label_column:
+        :param n_cluster_range:
+        :param trials:
+        :param plot_fig:
+        :param dimen_reducetion_method:
+        :param visualization_reduction_method:
+        :param output:
+        :param possible_clusters:
+        :return:
+        """
+        embeddings = [i[0] for i in df[embed_column]]
+        best_silhouette_score = -1.1
+        best_clustering = None
+        best_n_clusters = None
+        n_clusters_eval = []
+
+        # try different values of n_clusters, for each n cluster perform kmeans clustering
+        for n_clusters in range(n_cluster_range[0], n_cluster_range[1], n_cluster_range[2]):
+            clustering = self.KMeans_clustering_bert_token()
+
     def KMeans_clustering_bert_token(self, token_embeddings, n_clusters, trials=30, normalize=True):
         """
         This function takes a list of token embeddings, apply normalization on it and then apply kmeans clustering with
