@@ -72,7 +72,7 @@ acc, model = bert_train.train_wraper(train_iter=dataset_train, dev_iter=dataset_
 result = []
 # predict and extract representation
 for index in list(df_all.index):
-    x = df_all.ix[index]['embed']
+    x = torch.from_numpy(df_all.ix[index]['embed']).unsqueeze(0)
     sentence_level_representation = mdl.sentence_level_representation(x)
     logit = mdl(x)
     probs, predicted = torch.max(torch.exp(logit), 1)
