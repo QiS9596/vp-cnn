@@ -18,6 +18,7 @@ snapshot
 **/predictions*.txt
 
 vpcnn/data
+vpcnn/shortscript
 # vpcnn/data/*trec*
 # vpcnn/data/*shuffled*
 # vpcnn/data/corrected-added.tsv
