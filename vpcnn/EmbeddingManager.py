@@ -344,7 +344,8 @@ class BERTEmbedManager:
 
     def clustering_raw_embedding(self, df, embed_column='embed', label_column='labels', n_cluster_range=[2,15,2],
                                  trials=30, plot_fig=False, dimen_reducetion_method=None,
-                                 visualization_reduction_method='auto', output=None, possible_clusters='auto'):
+                                 visualization_reduction_method='auto', output=None, possible_clusters='auto',
+                                 token_name=''):
         """
 
         :param df:
@@ -357,6 +358,7 @@ class BERTEmbedManager:
         :param visualization_reduction_method:
         :param output:
         :param possible_clusters:
+        :param token_name: str; name of the token, used for title in visualization
         :return:
         """
         embeddings = [i[0] for i in df[embed_column]]
@@ -367,7 +369,44 @@ class BERTEmbedManager:
 
         # try different values of n_clusters, for each n cluster perform kmeans clustering
         for n_clusters in range(n_cluster_range[0], n_cluster_range[1], n_cluster_range[2]):
-            clustering = self.KMeans_clustering_bert_token()
+            clustering = self.KMeans_clustering_bert_token(embeddings, n_clusters, trials=trials)
+            # calculate average silhouette score for current clustering,
+            # and record it for study of the trend of clustering
+            average_silhouette_score = silhouette_score(embeddings, clustering.labels_)
+            n_clusters_eval.append((n_clusters, average_silhouette_score))
+            # record the best cluster
+            if average_silhouette_score > best_silhouette_score:
+                best_silhouette_score = average_silhouette_score
+                best_n_clusters = n_clusters
+                best_clustering = copy.deepcopy(clustering)
+        # plot
+        if plot_fig or output:
+            title = "Kmeans clustering on " + token_name
+            if visualization_reduction_method == 'auto' and dimen_reducetion_method is None:
+                reduced = decomp.PCA(n_components=3).fit_transform(embeddings)
+            if output == None:
+                output = None
+                if dimen_reducetion_method is not None:
+                    title += ' with dimensional reduction method ' + dimen_reducetion_method
+                if possible_clusters == 'auto':
+                    output_n_clusters = None
+            else:
+                name = token_name + '_kmeans_n-clusters'+ str(best_n_clusters)
+                if dimen_reducetion_method is not None:
+                    name += '_dimen_reduction' + dimen_reducetion_method
+                    title += ' with dimensional reduction method '+ dimen_reducetion_method
+                if possible_clusters == 'auto':
+                    name_n_clusters = name + '_n_clusters_silhouette.png'
+                if visualization_reduction_method == 'auto' and dimen_reducetion_method is None:
+                    name += '_visual_reductionPCA'
+                name += '.png'
+                output_n_clusters = os.path.join(output, name_n_clusters)
+                output = os.path.join(output, name)
+            self.silhouetteplot(embeddings, best_clustering.labels_, best_n_clusters, reduced, title=title,
+                                show=plot_fig, output=output)
+            if possible_clusters == 'auto':
+                self.line_plot_silhouette(n_clusters_eval, title=title, show=plot_fig, output=output_n_clusters)
+        return best_n_clusters, best_clustering, best_silhouette_score, n_clusters_eval
 
     def KMeans_clustering_bert_token(self, token_embeddings, n_clusters, trials=30, normalize=True):
         """
