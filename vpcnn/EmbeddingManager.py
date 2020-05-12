@@ -361,7 +361,7 @@ class BERTEmbedManager:
         :param token_name: str; name of the token, used for title in visualization
         :return:
         """
-        embeddings = [i[0] for i in df[embed_column]]
+        embeddings = [i for i in df[embed_column]]
         best_silhouette_score = -1.1
         best_clustering = None
         best_n_clusters = None
@@ -369,6 +369,7 @@ class BERTEmbedManager:
 
         # try different values of n_clusters, for each n cluster perform kmeans clustering
         for n_clusters in range(n_cluster_range[0], n_cluster_range[1], n_cluster_range[2]):
+            print(n_clusters)
             clustering = self.KMeans_clustering_bert_token(embeddings, n_clusters, trials=trials)
             # calculate average silhouette score for current clustering,
             # and record it for study of the trend of clustering

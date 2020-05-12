@@ -67,7 +67,7 @@ class VPDataset_bert_embedding(Dataset):
                     err.append(i)
             temp = [df['embed'][row_idx][x] for x in range(len(df['embed'][row_idx])) if x not in err]
             df['embed'][row_idx] = np.array(temp)
-            
+
             current_row_len = len(df['embed'][row_idx])
             # if the current row has the same length as the max sequence length, do nothing
             if current_row_len == max_seq_len:
@@ -172,6 +172,7 @@ class VPDataset_bert_embedding(Dataset):
                                            df_label])
                 trains.append(cls(df=train_current))
             return (trains, devs, test_)
+
     @classmethod
     def load_one_fold(cls, train_tsv, train_npy, eval_tsv, eval_npy, dev_split=0.1, max_seq_len=32, class_num=334):
         """
@@ -203,13 +204,13 @@ class VPDataset_bert_embedding(Dataset):
         train_df = VPDataset_bert_embedding.sequence_padding(train_df, max_seq_len=max_seq_len)
         eval_df = VPDataset_bert_embedding.sequence_padding(eval_df, max_seq_len=max_seq_len)
         # get the label data outof the training set
-        train_df_ = train_df[:len(train_df.index)-class_num]
-        label_df = train_df[len(train_df.index)-class_num:]
+        train_df_ = train_df[:len(train_df.index) - class_num]
+        label_df = train_df[len(train_df.index) - class_num:]
         dev_length = int(np.floor(dev_split * float(len(train_df_.index))))
 
         # TODO complete selecting development set
-        dev_df = train_df[int(-1*dev_length):]
-        train_df_ = pd.concat([train_df_[:int(-1*dev_length)], label_df])
+        dev_df = train_df[int(-1 * dev_length):]
+        train_df_ = pd.concat([train_df_[:int(-1 * dev_length)], label_df])
         for element in train_df_['embed']:
             if not isinstance(element, np.ndarray):
                 print('train set')
@@ -231,6 +232,7 @@ class VPDataset_bert_embedding(Dataset):
         return (cls(df=train_df_),
                 cls(df=dev_df),
                 cls(df=eval_df))
+
 
 class AutoEncoderPretrainDataset(Dataset):
     """
@@ -260,18 +262,129 @@ class AutoEncoderPretrainDataset(Dataset):
         # we'll use a loop to traverse the dataframe to collapse the sentence structure
         # which might not be a best implementation
         word_embeddings = []
-        #for index in list(embeddings.index):
-            # for each sentence we destroy the sentence structure and extends to the sequence of just embedding
+        # for index in list(embeddings.index):
+        # for each sentence we destroy the sentence structure and extends to the sequence of just embedding
 
         #    word_embeddings += embeddings.get(index).tolist()
         embeddings = embeddings.to_list()
         for sentence in embeddings:
-            #word_embeddings += sentence.reshape(-1, embed_dim)
-            word_embeddings += np.split(sentence, sentence.shape[0],1)
-        #def to_ndarray(list):
+            # word_embeddings += sentence.reshape(-1, embed_dim)
+            word_embeddings += np.split(sentence, sentence.shape[0], 1)
+        # def to_ndarray(list):
         #    return np.array(list)
         word_embeddings_df = pd.DataFrame()
         word_embeddings_df['embed'] = word_embeddings
         print(word_embeddings_df.to_numpy().shape)
-        #word_embeddings_df['embed'] = word_embeddings_df['embed'].apply(to_ndarray)
+        # word_embeddings_df['embed'] = word_embeddings_df['embed'].apply(to_ndarray)
         return cls(word_embeddings_df)
+
+
+class WeightedSumBERTCNNDataset(Dataset):
+    """
+    dataset object for weighted sum case.
+    The word embedding would be 2d for each token, which is embed_dim*layers
+    """
+
+    def __init__(self, df, embed_dim=768, layers=12):
+        """
+        initialization for dataset object on weighted sum bert CNN dataset
+        :param embed_dim: the dimensionality of single layer embedding
+        :param layers: the total number of layers
+        :param df: dataframe object
+        """
+        self.embed_dim = embed_dim
+        self.num_layers = layers
+        self.df = df
+
+    def __getitem__(self, index):
+        return {'label': self.df.iloc[index]['labels'], 'embed': self.df.iloc[index]['embed']}
+
+    def __len__(self):
+        return len(list(self.df.index))
+
+    @staticmethod
+    def sentence_padding(df, max_seq_len=32, embed_dim=768, layers=12):
+        """
+        Pad the sequence of embed filed of the input dataframe object.
+        Will pad each sequence to max_seq_len*embed_dim*layers dimensionality
+        :param df: dataframe object, should have embed and labels column
+        :param max_seq_len: max sequence length, int
+        :param embed_dim: int, dimensionality of embedding for each layer
+        :param layers: int number of layers for feature extraction of bert
+        :return: dataframe object
+        """
+        num_example = len(list(df.index))
+
+        for row_idx in range(num_example):
+            current_row_len = df['embed'][row_idx].shape[0]
+            if current_row_len == max_seq_len:
+                continue
+            # if the origin sequence is too long, then cut
+            elif current_row_len > max_seq_len:
+                df['embed'][row_idx] = df['embed'][row_idx][:max_seq_len][:]
+            elif df['embed'][row_idx].shape[0] == 0:
+                df['embed'][row_idx] = np.zeros((max_seq_len, embed_dim, layers))
+            else:
+                df['embed'][row_idx] = np.pad(df['embed'][row_idx],
+                                              ((0, 1), (0, 0), (0, 0)),
+                                              'constant',
+                                              constant_values=[0]
+                                              )
+        return df
+
+    @classmethod
+    def splits(cls, num_fold=10, foldid=0, all_df_name=None, all_npy_name=None, label_df_name=None, label_npy_name=None,
+               dev_split=0.1, max_seq_len=32, embed_dim=768, num_layers=12):
+        """
+        load and split the dataset, return the target fold for cross validation
+        The dataset is consist of two part, all and label
+        all is all the collected data, label is the label context for each class
+        for each fold we add a copy of label context to the training set to fight the skewness of the training data
+        Each part of the data is stored into a tsv file and a npy file, the npy file contains the embeddings for each
+        token
+        :param num_fold:
+        :param foldid:
+        :param all_df_name:
+        :param all_npy_name:
+        :param label_df_name:
+        :param label_npy_name:
+        :param dev_split:
+        :param max_seq_len:
+        :param embed_dim:
+        :param num_layers:
+        :return:
+        """
+        df_all = pd.read_csv(all_df_name, sep='\t', header=None, names=['labels', 'text'])
+        df_label = pd.read_csv(label_df_name, sep='\t', header=None, names=['labels', 'text'])
+
+        embed_all = np.load(all_npy_name, allow_pickle=True)
+        embed_label = np.load(label_npy_name, allow_pickle=True)
+
+        df_all = df_all['labels'].to_frame()
+        df_all['embed'] = embed_all
+
+        df_label = df_label['labels'].to_frame()
+        df_label['embed'] = embed_label
+
+        df_all = WeightedSumBERTCNNDataset.sentence_padding(df_all, max_seq_len=max_seq_len, embed_dim=embed_dim,
+                                                            layers=num_layers)
+        df_label = WeightedSumBERTCNNDataset.sentence_padding(df_label, max_seq_len=max_seq_len, embed_dim=embed_dim,
+                                                              layers=num_layers)
+        # we split the collected data into folds
+        fold_dfs = np.array_split(ary=df_all, indices_or_sections=num_fold)
+        # set test fold
+        test_fold = cls(df=fold_dfs[foldid], embed_dim=embed_dim, layers=num_layers)
+        # concat rest dfs into train-dev fold
+        train_dev_folds = fold_dfs[:foldid] + fold_dfs[foldid + 1:]
+        df_train_dev = pd.concat(train_dev_folds)
+        df_train_dev = df_train_dev.sample(frac=1)
+        dev_length = int(np.floor(dev_split * float(len(df_train_dev))))
+        # extract the tail of train-dev set as
+        dev_df = df_train_dev[int(-1 * dev_length):]
+        train_df = pd.concat([df_train_dev[:int(-1*dev_length)], df_label])
+        return (
+            cls(df=train_df, embed_dim=embed_dim, layers=num_layers),
+            cls(df=dev_df, embed_dim=embed_dim, layers=num_layers),
+            test_fold
+        )
+

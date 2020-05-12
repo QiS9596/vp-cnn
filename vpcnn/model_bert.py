@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from torch import autograd
 from torch.nn import init
 import numpy as np
+import weighted_sum_layer
 
 
 class CNN_Embed(nn.Module):
@@ -69,7 +70,6 @@ class CNN_Embed(nn.Module):
             pass
         print(sum(p.numel() for p in self.parameters() if p.requires_grad))
 
-
     def forward(self, x):
         x = self.confidence(x)
         # logit = F.log_softmax(x)
@@ -85,14 +85,178 @@ class CNN_Embed(nn.Module):
         x = self.dropout(x)
         linear_out = self.fc1(x)
         return linear_out
-    
-    def sentence_level_representation(self,x):
+
+    def sentence_level_representation(self, x):
         x = autograd.Variable(x.float()).cuda()
         x = x.unsqueeze(1)
         x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]
         x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x]
         x = torch.cat(x, 1)
         return x
+
+
+class WeightedSumEmbedding(nn.Module):
+    """
+
+    """
+
+    def __init__(self,
+                 class_num=334,
+                 kernel_num=300,
+                 kernel_sizes=[3, 4, 5],
+                 embed_dim=768,
+                 dropout=0.5,
+                 conv_init='default',
+                 fc_init='default'):
+        """
+
+        :param class_num:
+        :param kernel_num:
+        :param kernel_sizes:
+        :param embed_dim:
+        :param dropout:
+        :param conv_init:
+        :param fc_init:
+        """
+        super(WeightedSumEmbedding, self).__init__()
+        # weighted sum layer
+        self.intput = weighted_sum_layer.Weighted_Sum(embed_dim=embed_dim, layers=12)
+        # convolutional layers
+        self.convs1 = nn.ModuleList([nn.Conv2d(in_channels=1,
+                                               out_channels=kernel_num,
+                                               kernel_size=(kz, embed_dim)) for kz in kernel_sizes])
+        for layer in self.convs1:
+            if conv_init == 'ortho':
+                init.orthogonal(layer.weight.data)
+                layer.bias.data.zero_()
+            elif conv_init == 'uniform':
+                layer.weight.data.uniform_(-0.01, 0.01)
+                layer.bias.data.zero_()
+            elif conv_init == 'default':
+                pass
+        # drop out
+        self.dropout = nn.Dropout(dropout)
+        # output layer weight matrix
+        # the input dimensionality of output layer is len(kernel_sizes)* kernel_num, which mean for each single kernel
+        # it correspond to one dimension in output layer after pooling
+        # the output dimensionality of output layer is equal to class_num
+        # later a softmax will be applied to this layer
+        # output layer
+        self.fc1 = nn.Linear(len(kernel_sizes) * kernel_num, class_num)
+        if fc_init == 'ortho':
+            init.orthogonal(self.fc1.weight.data)
+            self.fc1.bias.data.zero_()
+        elif fc_init == 'normal':
+            init.normal(self.fc1.weight.data)
+            self.fc1.bias.data.zero_()
+        elif fc_init == 'default':
+            pass
+
+    def forward(self, x):
+        x = autograd.Variable(x.float()).cuda()
+        x = x.unsqueeze(1)
+        x = self.intput(x)
+        x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]
+        x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x]
+        x = torch.cat(x, 1)
+        x = self.dropout(x)
+        linear_out = self.fc1(x)
+        return F.log_softmax(linear_out)
+
+    def sentence_level_representation(self, x):
+        x = autograd.Variable(x.float()).cuda()
+        x = x.unsqueeze(1)
+        x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]
+        x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x]
+        x = torch.cat(x, 1)
+        return x
+
+    @staticmethod
+    def train_mdl(train, dev, model, optimizer='adadelta', epochs=25, batch_size=50, max_norm=3.0,
+                  no_always_norm=False):
+        # set model to train mode
+        model.train()
+        # declear optimizer
+        optimizer = torch.optim.Adadelta(model.parameters(), rho=0.95)
+        best_acc = 0
+        best_model = None
+        # generate train batchs, which is a sequence of python dicts obtained based on the given dataset
+
+        train_batchs_ = bert_train.generate_batches(dataset=train, batch_size=batch_size, shuffle=False,
+                                                    drop_last=False,
+                                                    device='cuda')
+        train_batchs = []
+        for batch in train_batchs_:
+            train_batchs.append(copy.deepcopy(batch))
+
+        for epoch in range(1, epochs+1):
+            batch_idx = 0
+            for batch in train_batchs:
+                feature = batch['embed']
+                target = batch['label']
+                # start training
+                optimizer.zero_grad()
+
+                logit = model(feature)
+                target = autograd.Variable(target).cuda()
+
+                # calculate loss, negative log likelihood
+                loss = F.nll_loss(logit, target)
+                loss.backward()
+                optimizer.step()
+
+                batch_idx += 1
+                if max_norm > 0:
+                    if not no_always_norm:
+                        for row in model.fc1.weight.data:
+                            norm = row.norm() + 1e-7
+                            row.div_(norm).mul_(max_norm)
+                    else:
+                        model.fc1.weight.data.renorm_(2, 0, max_norm)
+            acc = eval(dev, model, batch_size)
+            if acc > best_acc:
+                best_model = copy.deepcopy(model)
+        model = best_model
+        acc = eval(dev, model, batch_size)
+        return acc, model
+
+    @staticmethod
+    def eval_mdl(data, model, batch_size):
+        # set model to eval mode
+        model.eval()
+        corrects, avg_loss = 0, 0
+        batchs_ = bert_train.generate_batches(data, batch_size, shuffle=False, drop_last=False)
+        model.cuda()
+
+        for batch in batchs_:
+            feature = batch['embed']
+            target = batch['label']
+            target = autograd.Variable(target).cuda()
+            predicted = model(feature)
+            loss = F.nll_loss(input=predicted, target=target)
+            avg_loss += loss.data[0]
+            corrects += (torch.max(predicted, 1)
+                         [1].view(target.size()).data == target.data).sum()
+            # probs, predicted = torch.max(torch.exp(predicted), 1)
+            # predicted = predicted.cpu().data.numpy()
+            # target = target.data.cpu().numpy()
+            # if output:
+            #     with open(file_path, 'a') as file:
+            #         for i in range(predicted.shape[0]):
+            #             file.write(str(predicted[i][0]))
+            #             file.write(' ')
+            #             file.write(str(target[i]))
+            #             file.write('\n')
+        avg_loss /= len(data)
+        accuracy = corrects / len(data) * 100.0
+        model.train()
+        print('\nEvaluation - loss: {:.6f}  acc: {:.4f}%({}/{})'.format(avg_loss,
+                                                                        accuracy,
+                                                                        corrects,
+                                                                        len(data)))
+        return accuracy
+
+
 
 
 class BaseAutoEncoderDecoder(nn.Module, ABC):
@@ -223,6 +387,7 @@ class AutoEncoderDecoder(BaseAutoEncoderDecoder):
             if avg_loss < early_stop_loss:
                 break
         return avg_loss, mdl_
+
     @staticmethod
     def eval_mdl(data_iter, model, batch_size, use_cuda=True):
         """
@@ -343,12 +508,13 @@ class CNN_shirnk_dim(nn.Module):
         best_acc = 0
         best_model = None
         # generate batchs
-        train_batchs_ = bert_train.generate_batches(dataset=train, batch_size=batch_size, shuffle=False, drop_last=False)
+        train_batchs_ = bert_train.generate_batches(dataset=train, batch_size=batch_size, shuffle=False,
+                                                    drop_last=False)
         train_batchs = []
         for batch in train_batchs_:
             train_batchs.append(copy.deepcopy(batch))
         # begin training
-        for epoch in range(1, epochs+1):
+        for epoch in range(1, epochs + 1):
             batch_idx = 0
             for batch in train_batchs:
                 model.train()
@@ -386,4 +552,3 @@ class CNN_shirnk_dim(nn.Module):
         model = best_model
         acc = bert_train.eval(dev, model, batch_size, use_cuda)
         return acc, model
-
