@@ -24,7 +24,7 @@ class Weighted_Sum(Module):
         self.register_parameter('bias', None)
         self.reset_parameters()
 
-    def reset_prameters(self):
+    def reset_parameters(self):
         stdv = 1./math.sqrt(self.weight.size(1))
         self.weight.data.uniform_(-stdv, stdv)
 

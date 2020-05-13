@@ -31,7 +31,7 @@ def one_fold(fold_id=0):
                                                                         label_df_name=os.path.join(data_dir, label_tsv_name),
                                                                         label_npy_name=os.path.join(data_dir, label_npy_name))
     mdl = model_bert.WeightedSumEmbedding()
-    mdl.train(train, dev, mdl)
+    mdl.train_mdl(train, dev, mdl)
     mdl.eval_mdl(test, mdl, batch_size=40)
 
 one_fold()
