@@ -326,7 +326,7 @@ class WeightedSumBERTCNNDataset(Dataset):
                 df['embed'][row_idx] = np.zeros((max_seq_len, embed_dim, layers))
             else:
                 df['embed'][row_idx] = np.pad(df['embed'][row_idx],
-                                              ((0, 1), (0, 0), (0, 0)),
+                                              ((0, max_seq_len-current_row_len), (0, 0), (0, 0)),
                                               'constant',
                                               constant_values=[0]
                                               )
