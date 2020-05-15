@@ -29,6 +29,10 @@ class Weighted_Sum(Module):
         self.weight.data.uniform_(-stdv, stdv)
 
     def forward(self, input):
+        print(type(input))
+        print(input.size())
+        print(type(self.weight))
+        print(self.weight.size())
         return torch.mv(input, self.weight)
 
     def __repr__(self):
